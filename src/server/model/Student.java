@@ -1,27 +1,30 @@
 package server.model;
 
 public class Student extends User {
-    private int studentID;
+    private String studentID;
     private String faculty;
+    private String school;
 
     public Student(){
         super();
-        studentID = 0;
+        studentID = "";
         faculty = "";
+        school = "";
     }
 
     public Student(int userID, String firstName, String lastName, String email, String passwordHash,
-                   Role role, boolean isActivated, int studentID, String faculty){
+                   Role role, boolean isActivated, String studentID, String faculty, String school) {
         super(userID, firstName, lastName, email, passwordHash, role, isActivated);
         this.studentID = studentID;
         this.faculty = faculty;
+        this.school = school;
     }
 
-    public int getStudentID() {
+    public String getStudentID() {
         return studentID;
     }
 
-    public void setStudentID(int studentID) {
+    public void setStudentID(String studentID) {
         this.studentID = studentID;
     }
 
@@ -33,6 +36,14 @@ public class Student extends User {
         this.faculty = faculty;
     }
 
+    public String getSchool() {
+        return school;
+    }
+
+    public void setSchool(String school) {
+        this.school = school;
+    }
+
     @Override
     public String toString() {
         return "Student Information\n====================\n" +
@@ -40,6 +51,7 @@ public class Student extends User {
                 "Full Name: " + firstName + " " + lastName + "\n" +
                 "Email: " + email + "\n" +
                 "Faculty: " + faculty + "\n" +
+                "School: " + school + "\n" +
                 "Active: " + isActive + "\n";
     }
 }

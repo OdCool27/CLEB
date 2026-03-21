@@ -1,4 +1,38 @@
 package server.model;
 
 public class LabSeat {
+    private int seatID;
+    private Lab seatLocation;
+
+    public LabSeat(){
+        seatID = -1;
+        seatLocation = new Lab();
+    }
+
+    public LabSeat(int seatID, Lab seatLocation) {
+        this.seatID = seatID;
+        this.seatLocation = seatLocation;
+    }
+
+    public int getSeatID() {
+        return seatID;
+    }
+
+    public void setSeatID(int seatID) {
+        this.seatID = seatID;
+    }
+
+    public Lab getSeatLocation() {
+        return seatLocation;
+    }
+
+    public void setSeatLocation(Lab seatLocation) {
+        this.seatLocation = seatLocation;
+    }
+
+    public String toString() {
+        return "Seat Information\n" + "======================\n" +
+                "Seat ID: " + seatID + "\n" +
+                seatLocation.toString() + "\n";
+    }
 }
