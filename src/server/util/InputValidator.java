@@ -1,10 +1,8 @@
 package server.util;
 
-import java.io.IOException;
+//import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import javax.swing.JOptionPane;
 
 
 public class InputValidator {
@@ -18,36 +16,31 @@ public class InputValidator {
 		try {
 			//Check if email is null
 			if (email == null) {
-				JOptionPane.showMessageDialog(null, "Email can't be null", 
-						"Validation error", JOptionPane.ERROR_MESSAGE);
+				System.err.println("Validation error: Email can't be null");
 				return false;
 				}
 			
 			//Check if email is empty
 			if (email.trim().isEmpty()) {
-				JOptionPane.showMessageDialog(null, "Email can't be empty", 
-						"Validation error", JOptionPane.ERROR_MESSAGE);
+				System.err.println("Validation error: Email can't be empty");
 				return false;
 				}
 			
-			//Check leangth of email
+			//Check length of email
 			 if (email.length() > 254) {
-				 JOptionPane.showMessageDialog(null, "Email exceeds maximum length",
-		                "Validation Error", JOptionPane.ERROR_MESSAGE);
+				 System.err.println("Validation error: Email exceeds maximum length");
 	                return false;
 	                }
 	            
 	         //Check for consecutive dots
 			 if (email.contains("..")) {
-				 JOptionPane.showMessageDialog(null, "Email cannot contain consecutive dots",
-		                "Validation Error", JOptionPane.ERROR_MESSAGE);
+				 System.err.println("Validation error: Email cannot contain consecutive dots");
 	                return false;
 	                }
 			 
 			 //Check if email starts or ends with dot
 			 if (email.startsWith(".") || email.endsWith(".")) {
-				 JOptionPane.showMessageDialog(null, "Email cannot start or end with a dot",
-		                "Validation Error", JOptionPane.ERROR_MESSAGE);
+				 System.err.println("Validation error: Email cannot start or end with a dot");
 	                return false;
 	                }
 			 
@@ -57,12 +50,11 @@ public class InputValidator {
 		
 		//Error handling
 		}catch (IllegalArgumentException ie) {
-			JOptionPane.showMessageDialog(null, "Illegal input during validation" + ie.getMessage(),
-	                "Validation Error", JOptionPane.ERROR_MESSAGE);
-
+			System.err.println("Illegal input during validation: " + ie.getMessage());
+			ie.printStackTrace();
 		}catch (Exception e) {
-			JOptionPane.showMessageDialog(null, "Unexpected error during validation" + e.getMessage(),
-	                "Validation Error", JOptionPane.ERROR_MESSAGE);
+			System.err.println("Unexpected error during validation: " + e.getMessage());
+			e.printStackTrace();
 		}
 		return false;
 			
@@ -73,31 +65,27 @@ public class InputValidator {
 	public static boolean validatePassword(String password) {
 		
 		try {
-			 //Check if password is null 
+			//Check if password is null 
 	        if (password == null) {
-	            JOptionPane.showMessageDialog(null, "Password cannot be null",
-	                    "Validation Error", JOptionPane.ERROR_MESSAGE);
+	            System.err.println("Validation error: Password cannot be null");
 	            return false;
 	        }
 
 	        //Check if password is empty
 	        if (password.isEmpty()) {
-	            JOptionPane.showMessageDialog(null, "Password cannot be empty",
-	                    "Validation Error", JOptionPane.ERROR_MESSAGE);
+	            System.err.println("Validation error: Password cannot be empty");
 	            return false;
 	        }
 	        
 	        //Check password minimum length
 	        if (password.length() < 8) {
-	            JOptionPane.showMessageDialog(null, "Password is too short",
-	                    "Validation Error", JOptionPane.ERROR_MESSAGE);
+	            System.err.println("Validation error: Password is too short");
 	            return false;
 	        }
 
 	        //Check password max length
 	        if (password.length() > 64) {
-	            JOptionPane.showMessageDialog(null, "Password is exceeds limit",
-	                    "Validation Error", JOptionPane.ERROR_MESSAGE);
+	            System.err.println("Validation error: Password exceeds limit");
 	            return false;
 	        }
 	        
@@ -105,28 +93,26 @@ public class InputValidator {
 	        if(checkPassword(password)) {
 	        	
 	        	if (password.length() >= 8 && password.length() <= 64) {
-	                JOptionPane.showMessageDialog(null, "Password is strong!",
-	                        "Valid password", JOptionPane.INFORMATION_MESSAGE);
+	                System.out.println("Password is strong!");
 	            }
 					return true;
 				}
 				else 
 				{
-					JOptionPane.showMessageDialog(null, "Password is weak. Must contain:\n" 
+					System.err.println("Validation error: Password is weak. Must contain:\n" 
 							+ "- Uppercase letter\n"
 							+ "- Lowercase letter\n"
 							+ "- Number\n"
-							+ "- Special characters (! @ # $ ^ * & %)", 
-							"Validation Error", JOptionPane.ERROR_MESSAGE);
+							+ "- Special characters (! @ # $ ^ * & %)");
 					return false;
 				}
 	        
 			}catch (NullPointerException npe) {
-				JOptionPane.showMessageDialog(null, "Password can't be null" + npe.getMessage(),
-		                "Validation Error", JOptionPane.ERROR_MESSAGE);
+				System.err.println("Password can't be null: " + npe.getMessage());
+				npe.printStackTrace();
 			}catch (Exception e) {
-				JOptionPane.showMessageDialog(null, "Unexpected error during validation: " + e.getMessage(),
-		                "Validation Error", JOptionPane.ERROR_MESSAGE);
+				System.err.println("Unexpected error during validation: " + e.getMessage());
+				e.printStackTrace();
 				return false;
 				}
 		
@@ -176,8 +162,8 @@ public class InputValidator {
 		
 		
 	}catch (Exception e) {
-		JOptionPane.showMessageDialog(null, "Error while checking password: " + e.getMessage(),
-                "Validation Error", JOptionPane.ERROR_MESSAGE);
+		System.err.println("Error while checking password: " + e.getMessage());
+		e.printStackTrace();
         return false;
         }
 		return false;
