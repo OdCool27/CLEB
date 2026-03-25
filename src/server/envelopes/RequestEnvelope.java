@@ -1,8 +1,9 @@
 package server.envelopes;
 
+import java.io.Serializable;
 import java.util.UUID;
 
-public class RequestEnvelope<T> {
+public class RequestEnvelope<T> implements Serializable {
     private final UUID correlationId;
     private final String action;
     private final T payload;
