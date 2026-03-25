@@ -87,14 +87,14 @@ public class InputValidator {
 	            return false;
 	        }
 	        
-	      //Check password minimum length
+	        //Check password minimum length
 	        if (password.length() < 8) {
 	            JOptionPane.showMessageDialog(null, "Password is too short",
 	                    "Validation Error", JOptionPane.ERROR_MESSAGE);
 	            return false;
 	        }
 
-	      //Check password max length
+	        //Check password max length
 	        if (password.length() > 64) {
 	            JOptionPane.showMessageDialog(null, "Password is exceeds limit",
 	                    "Validation Error", JOptionPane.ERROR_MESSAGE);
