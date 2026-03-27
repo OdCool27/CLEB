@@ -25,10 +25,9 @@ public class Server {
 
 
     public Server() {
-        createConnection();
         dbUtil = new DBUtil();
+        createConnection();
         waitForRequest();
-
     }
 
 
@@ -45,7 +44,7 @@ public class Server {
     private void waitForRequest(){
         try {
             while(true){
-                Thread clientThread = new Thread(new ClientHandler(serverSocket.accept()));
+                Thread clientThread = new Thread(new ClientHandler(serverSocket.accept(), dbUtil.getDBConn()));
                 clientThread.start();
             }
         } catch (IOException ioe) {
@@ -56,7 +55,6 @@ public class Server {
 
         }
     }
-
 
 
     public static void main(String[] args) {

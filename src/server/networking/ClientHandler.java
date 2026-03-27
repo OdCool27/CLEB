@@ -10,15 +10,20 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 
+import java.sql.Connection;
+
 public class ClientHandler implements Runnable {
     private Socket socket;
     private ObjectOutputStream out;
     private ObjectInputStream in;
     private RequestDispatcher dispatcher;
+    private Connection dbConn;
 
 
-    public ClientHandler(Socket socket) {
+    public ClientHandler(Socket socket, Connection dbConn) {
         this.socket = socket;
+        this.dbConn = dbConn;
+        this.dispatcher = new RequestDispatcher();
     }
 
     private void closeConnections(){
@@ -50,7 +55,7 @@ public class ClientHandler implements Runnable {
                 try{
 
                     RequestEnvelope<?> request = (RequestEnvelope<?>) in.readObject();
-                    ResponseEnvelope<?> response = dispatcher.dispatch(request);
+                    ResponseEnvelope<?> response = dispatcher.dispatch(request, dbConn);
                     out.writeObject(response);
                     out.flush();
 
