@@ -52,6 +52,7 @@ public class ClientHandler implements Runnable {
                     RequestEnvelope<?> request = (RequestEnvelope<?>) in.readObject();
                     ResponseEnvelope<?> response = dispatcher.dispatch(request);
                     out.writeObject(response);
+                    out.flush();
 
                 }catch (ClassNotFoundException cnfe) {
                     cnfe.printStackTrace();

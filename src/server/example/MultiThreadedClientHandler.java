@@ -57,7 +57,7 @@ public class MultiThreadedClientHandler implements Runnable {
                     
                     Object input = in.readObject();
                     if (input instanceof RequestEnvelope<?> request) {
-                        ResponseEnvelope<?> response = dispatcher.dispatch(request, dbConn);
+                        ResponseEnvelope<?> response = dispatcher.dispatch(request);
                         out.writeObject(response);
                         out.flush();
                     } else if (input instanceof String action) {
@@ -66,7 +66,7 @@ public class MultiThreadedClientHandler implements Runnable {
                         // Original ClientHandler expected a RequestEnvelope after action
                         Object nextInput = in.readObject();
                         if (nextInput instanceof RequestEnvelope<?> request) {
-                            ResponseEnvelope<?> response = dispatcher.dispatch(request, dbConn);
+                            ResponseEnvelope<?> response = dispatcher.dispatch(request);
                             out.writeObject(response);
                             out.flush();
                         }
