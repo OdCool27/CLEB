@@ -12,7 +12,7 @@ import java.sql.Connection;
 public class LoginHandler implements RequestHandler<User> {
 
     @Override
-    public ResponseEnvelope<User> handleRequest(RequestEnvelope<?> request, Connection conn) {
+    public ResponseEnvelope<User> handleRequest(RequestEnvelope<?> request) {
 
         // Cast payload safely
         LoginRequestDTO dto = (LoginRequestDTO) request.getPayload();

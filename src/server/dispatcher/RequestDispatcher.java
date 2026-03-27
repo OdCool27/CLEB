@@ -16,7 +16,7 @@ public class RequestDispatcher {
         handlers.put("LOGIN", new LoginHandler());
     }
 
-    public ResponseEnvelope<?> dispatch(RequestEnvelope requestEnvelope, Connection dbConn){
+    public ResponseEnvelope<?> dispatch(RequestEnvelope requestEnvelope){
 
         RequestHandler<?> handler = handlers.get(requestEnvelope.getAction());
 
@@ -25,6 +25,6 @@ public class RequestDispatcher {
                     "Unknown Action", "FAIL", requestEnvelope.getAction());
         }
 
-        return handler.handleRequest(requestEnvelope, dbConn);
+        return handler.handleRequest(requestEnvelope);
     }
 }
