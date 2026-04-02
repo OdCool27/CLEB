@@ -5,11 +5,13 @@ import server.model.LabSeat;
 import server.model.LabSeatReservation;
 import server.model.Student;
 import server.model.User;
+import server.service.NotificationService;
 
 import java.util.UUID;
 
 public class TestDriver {
     public static void main(String[] args) {
-        System.out.println(new LabSeatReservation());
+        NotificationService notificationService = new NotificationService();
+        notificationService.sendEmail("odanecollins@live.com", "Test", "Testing this Email Notification");
     }
 }

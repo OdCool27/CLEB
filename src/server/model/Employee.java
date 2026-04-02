@@ -5,19 +5,22 @@ import java.util.Set;
 
 public class Employee extends User {
     private String empID;
+    private String jobTitle;
     private Set<String> permissions;
 
     public Employee() {
         super();
         empID = "";
+        jobTitle = "";
         permissions = new HashSet<>();
     }
 
     public Employee(int userID, String firstName, String lastName, String email,
                     String passwordHash, Role role, boolean isActivated,
-                    String empID, Set<String> permissions) {
+                    String empID, String jobTitle, Set<String> permissions) {
         super(userID, firstName, lastName, email, passwordHash, role, isActivated);
         this.empID = empID;
+        this.jobTitle = jobTitle;
         this.permissions = permissions;
     }
 
@@ -27,6 +30,14 @@ public class Employee extends User {
 
     public void setEmpID(String empID) {
         this.empID = empID;
+    }
+
+    public String getJobTitle() {
+        return jobTitle;
+    }
+
+    public void setJobTitle(String jobTitle) {
+        this.jobTitle = jobTitle;
     }
 
     public Set<String> getPermissions() {

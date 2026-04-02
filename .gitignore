@@ -1,0 +1,10 @@
+*.properties
+*.env
+out/
+.idea/
+*.class
+.project
+.settings/
+.classpath
+bin/
+*.iml
