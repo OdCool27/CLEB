@@ -173,7 +173,7 @@ public class AdminApprovals extends JInternalFrame{
         gbc.insets = new Insets(0, 0, 0, 10);
  
         JLabel hint = new JLabel("Select a row then choose an action");
-        hint.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        hint.setFont(new Font("SansSerif", Font.PLAIN, 1));
         hint.setForeground(Color.DARK_GRAY);
         gbc.gridx   = 0;
         gbc.weightx = 1.0;
