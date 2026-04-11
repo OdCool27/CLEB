@@ -10,7 +10,7 @@ import java.sql.SQLException;
 public class DBUtil {
     private static final Logger logger = LogManager.getLogger(DBUtil.class);
     private Connection dbConn;
-    private final String URL = "jdbc:mysql://localhost:3307/dbLab07";
+    private final String URL = "jdbc:mysql://localhost:3307/cleb_db";
     private final String USER = "root";
     private final String PASSWORD = "usbw";
 

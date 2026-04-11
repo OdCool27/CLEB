@@ -1,6 +1,6 @@
 package server.model;
 
-public class Student extends User {
+import java.time.LocalDateTime;public class Student extends User {
     private String studentID;
     private String faculty;
     private String school;
@@ -13,8 +13,8 @@ public class Student extends User {
     }
 
     public Student(int userID, String firstName, String lastName, String email, String passwordHash,
-                   Role role, boolean isActivated, String studentID, String faculty, String school) {
-        super(userID, firstName, lastName, email, passwordHash, role, isActivated);
+                   Role role, boolean isActivated, LocalDateTime lastUpdated, String studentID, String faculty, String school) {
+        super(userID, firstName, lastName, email, passwordHash, role, isActivated, lastUpdated);
         this.studentID = studentID;
         this.faculty = faculty;
         this.school = school;

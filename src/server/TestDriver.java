@@ -1,5 +1,7 @@
 package server;
 
+import server.dao.StudentDAO;
+import server.dao.UserDAO;
 import server.envelopes.RequestEnvelope;
 import server.model.LabSeat;
 import server.model.LabSeatReservation;
@@ -11,7 +13,8 @@ import java.util.UUID;
 
 public class TestDriver {
     public static void main(String[] args) {
-        NotificationService notificationService = new NotificationService();
-        notificationService.sendEmail("odanecollins@live.com", "Test", "Testing this Email Notification");
+//        NotificationService notificationService = new NotificationService();
+//        notificationService.sendEmail("odanecollins@live.com", "Test", "Testing this Email Notification");
+
     }
 }

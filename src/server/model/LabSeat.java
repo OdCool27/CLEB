@@ -2,10 +2,12 @@ package server.model;
 
 public class LabSeat {
     private int seatID;
+    private String seatCode;
     private Lab seatLocation;
 
     public LabSeat(){
         seatID = -1;
+        seatCode = "";
         seatLocation = new Lab();
     }
 
@@ -20,6 +22,14 @@ public class LabSeat {
 
     public void setSeatID(int seatID) {
         this.seatID = seatID;
+    }
+
+    public String getSeatCode() {
+        return seatCode;
+    }
+
+    public void setSeatCode(String seatCode) {
+        this.seatCode = seatCode;
     }
 
     public Lab getSeatLocation() {

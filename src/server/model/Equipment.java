@@ -3,17 +3,17 @@ package server.model;
 public class Equipment {
     private String equipmentID;
     private String description;
-    private Location location;
+    private Lab location;
     private String status;
 
     public Equipment() {
         equipmentID = "";
         description = "";
-        location = null;
+        location = new Lab();
         status = "";
     }
 
-    public Equipment(String equipmentID, String description, Location location, String status) {
+    public Equipment(String equipmentID, String description, Lab location, String status) {
         this.equipmentID = equipmentID;
         this.description = description;
         this.location = location;
@@ -36,11 +36,11 @@ public class Equipment {
         this.description = description;
     }
 
-    public Location getLocation() {
+    public Lab getLocation() {
         return location;
     }
 
-    public void setLocation(Location location) {
+    public void setLocation(Lab location) {
         this.location = location;
     }
 

@@ -1,191 +1,258 @@
 package server.dao;
-
+import server.dto.StudentDTO;
 import server.model.Student;
 import server.model.User;
-import server.util.LoggingUtil;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-
 public class StudentDAO {
     private Connection conn;
+    private UserDAO userDAO;
 
     public StudentDAO(Connection conn) {
         this.conn = conn;
-        LoggingUtil.debug(StudentDAO.class, "StudentDAO initialized with connection");
+        this.userDAO = new UserDAO(conn);
     }
-    
 
-    public boolean insertStudent(Student student) {
-        String query = "INSERT INTO students (userID, studentID, faculty, school) " +
-                       "VALUES (?, ?, ?, ?)";
-        
-        try {
-            LoggingUtil.debug(StudentDAO.class, "Inserting student into database: {}", student.getStudentID());
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, student.getUserID());
-            pstmt.setString(2, student.getStudentID());
-            pstmt.setString(3, student.getFaculty());
-            pstmt.setString(4, student.getSchool());
-            
-            int rowsAffected = pstmt.executeUpdate();
-            LoggingUtil.info(StudentDAO.class, "Student inserted successfully: {}", student.getStudentID());
-            return rowsAffected > 0;
-            
-        } catch (SQLException e) {
-            LoggingUtil.error(StudentDAO.class, "SQLException while inserting student: {}", e, student.getStudentID());
-            return false;
-        } catch (Exception e) {
-            LoggingUtil.error(StudentDAO.class, "Unexpected exception while inserting student: {}", e, student.getStudentID());
-            return false;
-        }
-    }
-    
+    //INITIALIZES STUDENT TABLE
+    public boolean initializeTable(){
+        userDAO.initializeTable();//initializes user table first
 
-    public Student getStudentById(int userID) {
-        String query = "SELECT * FROM students WHERE userID = ?";
-        
-        try {
-            LoggingUtil.debug(StudentDAO.class, "Fetching student from database with user ID: {}", userID);
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, userID);
-            
-            ResultSet rs = pstmt.executeQuery();
-            
-            if (rs.next()) {
-                LoggingUtil.debug(StudentDAO.class, "Student found in database: {}", userID);
-                return mapResultSetToStudent(rs);
-            } else {
-                LoggingUtil.warn(StudentDAO.class, "Student not found in database: {}", userID);
-                return null;
-            }
-            
-        } catch (SQLException e) {
-            LoggingUtil.error(StudentDAO.class, "SQLException while fetching student: {}", e, userID);
-            return null;
-        } catch (Exception e) {
-            LoggingUtil.error(StudentDAO.class, "Unexpected exception while fetching student: {}", e, userID);
-            return null;
+        String sql = "CREATE TABLE IF NOT EXISTS Student (" +
+                "userID INT PRIMARY KEY NOT NULL, " +
+                "studentID VARCHAR(8) NOT NULL UNIQUE, " +
+                "faculty VARCHAR(50) NOT NULL, " +
+                "school VARCHAR(50) NOT NULL, " +
+                "FOREIGN KEY (userID) REFERENCES `User`(userID) ON DELETE CASCADE " +
+                ");";
+
+        try(PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.execute();
+            return true;
+
+        }catch(SQLException sqle){
+            System.out.println("Failed to initialize table: "+ sqle.getMessage());
+        }catch(Exception e){
+            e.printStackTrace();
         }
+
+        return false;
     }
-    
-  
-    public Student getStudentByStudentID(String studentID) {
-        String query = "SELECT * FROM students WHERE studentID = ?";
-        
-        try {
-            LoggingUtil.debug(StudentDAO.class, "Fetching student from database with student ID: {}", studentID);
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setString(1, studentID);
-            
-            ResultSet rs = pstmt.executeQuery();
-            
-            if (rs.next()) {
-                LoggingUtil.debug(StudentDAO.class, "Student found in database: {}", studentID);
-                return mapResultSetToStudent(rs);
-            } else {
-                LoggingUtil.warn(StudentDAO.class, "Student not found in database: {}", studentID);
-                return null;
+
+    //---------------------------CREATE OPERATION------------------------------------
+    public boolean saveStudent(Student student){
+
+        initializeTable();//Ensures all necessary tables are initialized
+
+        if(userDAO.saveUser(student)) {//Saves user before saving student
+            String sql = "INSERT INTO Student (userID, studentID, faculty, school) VALUES (?, ?, ?, ?)";
+
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setInt(1, student.getUserID());
+                pstmt.setString(2, student.getStudentID());
+                pstmt.setString(3, student.getFaculty());
+                pstmt.setString(4, student.getSchool());
+
+
+                int rowsInserted = pstmt.executeUpdate();
+                return rowsInserted > 0;
+
+            } catch (SQLException sqle) {
+                System.out.println("Failed to save student: " + sqle.getMessage());
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-            
-        } catch (SQLException e) {
-            LoggingUtil.error(StudentDAO.class, "SQLException while fetching student: {}", e, studentID);
-            return null;
-        } catch (Exception e) {
-            LoggingUtil.error(StudentDAO.class, "Unexpected exception while fetching student: {}", e, studentID);
-            return null;
         }
+
+        return false;
     }
-    
-   
-    public List<Student> getAllStudents() {
-        String query = "SELECT * FROM students";
+
+    //-------------------------------READ OPERATIONS----------------------------------------------
+
+    //RETRIEVE INDIVIDUAL STUDENT USING STUDENT ID
+    public Student getStudentByStudentId(String inputtedStudentID){
+        String sql = "SELECT * " +
+                "FROM `User` u " +
+                "INNER JOIN Student s ON u.userID = s.userID " +
+                "WHERE s.studentID = ?";
+
+        try(PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.setString(1, inputtedStudentID);
+            ResultSet rs = pstmt.executeQuery();
+
+            while(rs.next()){
+                int userID = rs.getInt("userID");
+                String firstName = rs.getString("firstName");
+                String lastName = rs.getString("lastName");
+                String email = rs.getString("email");
+                String passwordHash = rs.getString("passwordHash");
+                User.Role userRole = User.Role.valueOf(rs.getString("role"));
+                boolean active = rs.getBoolean("active");
+                LocalDateTime lastUpdated = rs.getTimestamp("lastUpdated").toLocalDateTime();
+
+                String studentID = rs.getString("studentID");
+                String faculty = rs.getString("faculty");
+                String school = rs.getString("school");
+
+                return new Student(userID, firstName, lastName, email, passwordHash,
+                        userRole, active, lastUpdated, studentID, faculty, school);
+            }
+        }catch(SQLException sqle){
+            System.out.println("Failed to get Student: " + sqle.getMessage());
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+
+    //RETRIEVE INDIVIDUAL STUDENT USING EMAIL
+    public Student getStudentByEmail(String inputtedEmail){
+        String sql = "SELECT * " +
+                "FROM `User` u " +
+                "INNER JOIN Student s ON u.userID = s.userID " +
+                "WHERE u.email = ?";
+
+        try(PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.setString(1, inputtedEmail);
+            ResultSet rs = pstmt.executeQuery();
+
+            while(rs.next()){
+                int userID = rs.getInt("userID");
+                String firstName = rs.getString("firstName");
+                String lastName = rs.getString("lastName");
+                String email = rs.getString("email");
+                String passwordHash = rs.getString("passwordHash");
+                User.Role userRole = User.Role.valueOf(rs.getString("role"));
+                boolean active = rs.getBoolean("active");
+                LocalDateTime lastUpdated = rs.getTimestamp("lastUpdated").toLocalDateTime();
+
+                String studentID = rs.getString("studentID");
+                String faculty = rs.getString("faculty");
+                String school = rs.getString("school");
+
+                return new Student(userID, firstName, lastName, email, passwordHash,
+                        userRole, active, lastUpdated, studentID, faculty, school);
+            }
+        }catch(SQLException sqle){
+            System.out.println("Failed to get Student: " + sqle.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+
+    //RETRIEVE ALL STUDENTS
+    public List<Student> getAllStudents(){
         List<Student> students = new ArrayList<>();
-        
-        try {
-            LoggingUtil.debug(StudentDAO.class, "Fetching all students from database");
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery(query);
-            
-            while (rs.next()) {
-                Student student = mapResultSetToStudent(rs);
-                students.add(student);
+        String sql = "SELECT * FROM `User` u INNER JOIN Student s ON u.userID = s.userID";
+
+        try(PreparedStatement pstmt = conn.prepareStatement(sql)){
+            ResultSet rs = pstmt.executeQuery();
+
+            while(rs.next()){
+                int userID = rs.getInt("userID");
+                String firstName = rs.getString("firstName");
+                String lastName = rs.getString("lastName");
+                String email = rs.getString("email");
+                String passwordHash = rs.getString("passwordHash");
+                User.Role userRole = User.Role.valueOf(rs.getString("role"));
+                boolean active = rs.getBoolean("active");
+                LocalDateTime lastUpdated = rs.getTimestamp("lastUpdated").toLocalDateTime();
+
+                String studentID = rs.getString("studentID");
+                String faculty = rs.getString("faculty");
+                String school = rs.getString("school");
+
+                Student s = new Student(userID, firstName, lastName, email, passwordHash,
+                        userRole, active, lastUpdated, studentID, faculty, school);
+
+                students.add(s);
             }
-            
-            LoggingUtil.info(StudentDAO.class, "Retrieved {} students from database", students.size());
+
             return students;
-            
-        } catch (SQLException e) {
-            LoggingUtil.error(StudentDAO.class, "SQLException while fetching all students", e);
-            return students;
+
+        }catch(SQLException sqle){
+            System.out.println("Failed to get All Students: " + sqle.getMessage());
         } catch (Exception e) {
-            LoggingUtil.error(StudentDAO.class, "Unexpected exception while fetching all students", e);
-            return students;
+            e.printStackTrace();
         }
-    }
-    
 
-    public boolean updateStudent(Student student) {
-        String query = "UPDATE students SET studentID = ?, faculty = ?, school = ? WHERE userID = ?";
-        
-        try {
-            LoggingUtil.debug(StudentDAO.class, "Updating student in database: {}", student.getStudentID());
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setString(1, student.getStudentID());
-            pstmt.setString(2, student.getFaculty());
-            pstmt.setString(3, student.getSchool());
-            pstmt.setInt(4, student.getUserID());
-            
-            int rowsAffected = pstmt.executeUpdate();
-            LoggingUtil.info(StudentDAO.class, "Student updated successfully: {}", student.getStudentID());
-            return rowsAffected > 0;
-            
-        } catch (SQLException e) {
-            LoggingUtil.error(StudentDAO.class, "SQLException while updating student: {}", e, student.getStudentID());
-            return false;
+        return students;
+    }
+
+
+    //-------------------------- UPDATE OPERATION-----------------------------------------------
+
+    //UPDATE STUDENT AND USER TABLE
+    public boolean updateStudent(Student student){
+        boolean userUpdated = userDAO.updateUser(student);//Updates User table - May not yield any result based on what has been changed
+
+        String sql = "UPDATE Student SET " +
+                "faculty = ?, " +
+                "school = ? " +
+                "WHERE studentID = ?";
+
+        try(PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.setString(1, student.getFaculty());
+            pstmt.setString(2, student.getSchool());
+            pstmt.setString(3, student.getStudentID());
+
+            int rowsUpdated = pstmt.executeUpdate();
+            boolean studentUpdated = rowsUpdated > 0;
+
+            return studentUpdated || userUpdated; //IF SOMETHING IS UPDATED THEN RETURN TRUE
+
+        }catch(SQLException sqle){
+            System.out.println("Failed to update Student: " + sqle.getMessage());
         } catch (Exception e) {
-            LoggingUtil.error(StudentDAO.class, "Unexpected exception while updating student: {}", e, student.getStudentID());
-            return false;
+            e.printStackTrace();
         }
-    }
-    
 
-    public boolean deleteStudent(int userID) {
-        String query = "DELETE FROM students WHERE userID = ?";
-        
-        try {
-            LoggingUtil.debug(StudentDAO.class, "Deleting student from database: {}", userID);
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, userID);
-            
-            int rowsAffected = pstmt.executeUpdate();
-            LoggingUtil.info(StudentDAO.class, "Student deleted successfully: {}", userID);
-            return rowsAffected > 0;
-            
-        } catch (SQLException e) {
-            LoggingUtil.error(StudentDAO.class, "SQLException while deleting student: {}", e, userID);
-            return false;
-        } catch (Exception e) {
-            LoggingUtil.error(StudentDAO.class, "Unexpected exception while deleting student: {}", e, userID);
-            return false;
+        return false;
+    }
+
+    //----------------------------- DELETE OPERATIONS --------------------------------------------
+
+    //DELETE A SINGLE USER BY ID - No Need to call User Delete Method since the table has Casacade on delete
+    public boolean deleteStudentById(String studentID){
+        String sql = "DELETE FROM Student WHERE studentID = ?";
+
+        try(PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.setString(1, studentID);
+
+            int rowsDeleted = pstmt.executeUpdate();
+            return rowsDeleted > 0;
+
+        }catch(SQLException sqle){
+            System.out.println("Failed to delete Student: " + sqle.getMessage());
+        }catch (Exception e){
+            e.printStackTrace();
         }
+
+        return false;
     }
-    
 
-    private Student mapResultSetToStudent(ResultSet rs) throws SQLException {
-        LoggingUtil.debug(StudentDAO.class, "Mapping ResultSet to Student object");
-        
-        int userID = rs.getInt("userID");
-        String studentID = rs.getString("studentID");
-        String faculty = rs.getString("faculty");
-        String school = rs.getString("school");
-        
+    //DELETE ALL STUDENTS
+    public boolean deleteAllStudents(){
+        String sql = "DELETE FROM Student";
 
-        return new Student(userID, "", "", "", "", User.Role.STUDENT, true, studentID, faculty, school);
+        try(PreparedStatement pstmt = conn.prepareStatement(sql)){
+            int rowsDeleted = pstmt.executeUpdate();
+
+            return rowsDeleted > 0;
+
+        }catch(SQLException sqle){
+            System.out.println("Failed to delete All Students: " + sqle.getMessage());
+        }
+
+        return false;
     }
 }

@@ -16,7 +16,7 @@ public class NotificationService {
     public NotificationService(){
         try(FileInputStream input = new FileInputStream(this.propertiesFilePath)){
             smtpProps.load(input);
-            System.out.println("Success!");
+            System.out.println("Notification Service Started Successfully");
         }catch(IOException e){
             throw new RuntimeException("Failed to load SMTP config file", e );
         }
@@ -48,10 +48,10 @@ public class NotificationService {
             message.setContent(content, "text/html; charset=utf-8");
 
             Transport.send(message);
-            System.out.println("Email Sent to " + to);
+            System.out.println("Email Sent to " + to);//TO BE REPLACED WITH A LOGGER
 
         }catch (MessagingException e){
-            System.err.println("Failed to send email " + e.getMessage());
+            System.err.println("Failed to send email " + e.getMessage());//TO BE REPLACED WITH A LOGGER
             e.printStackTrace();
         }
     }
