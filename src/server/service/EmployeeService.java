@@ -16,6 +16,7 @@ public class EmployeeService implements UserService {
     @Override
     public boolean createUser(User user) {
         if (user instanceof Employee) {
+            NotificationService.sendAccountCreationNotification((Employee) user);
             return employeeDAO.saveEmployee((Employee) user);
         }
         return false;
@@ -24,6 +25,7 @@ public class EmployeeService implements UserService {
     @Override
     public boolean modifyUser(User user) throws AuthenticationException {
         if (user instanceof Employee) {
+            NotificationService.sendAccountModificationNotification((Employee) user);
             return employeeDAO.updateEmployee((Employee) user);
         }
         return false;

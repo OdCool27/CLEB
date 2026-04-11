@@ -58,7 +58,7 @@ public class Equipment {
 
     @Override
     public String toString() {
-        return "Equipment Information\n====================\n" +
+        return "\n\nEquipment Information\n====================\n" +
                 "Equipment ID: " + equipmentID + "\n" +
                 "Description: " + description + "\n" +
                 "Location: " + location + "\n" +

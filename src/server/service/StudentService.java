@@ -18,6 +18,7 @@ public class StudentService implements UserService {
     @Override
     public boolean createUser(User user) {
         Student s = (Student) user;
+        NotificationService.sendAccountCreationNotification(s);
         return studentDAO.saveStudent(s);
     }
 
@@ -25,6 +26,7 @@ public class StudentService implements UserService {
     @Override
     public boolean modifyUser(User user) throws AuthenticationException{
         Student s = (Student) user;
+        NotificationService.sendAccountModificationNotification(s);
         return studentDAO.updateStudent(s);
     }
 

@@ -1,58 +1,47 @@
 package server.service;
 
-import java.io.FileInputStream;
-import java.io.IOException;
-import jakarta.mail.PasswordAuthentication;
-import java.util.Properties;
-import jakarta.mail.*;
-import jakarta.mail.internet.InternetAddress;
-import jakarta.mail.internet.MimeMessage;
+import server.model.Reservation;import server.model.User;import server.util.SMTPUtil;
 
 public class NotificationService {
-    private final Properties smtpProps = new Properties();
-    String propertiesFilePath = "src/server/smtp.properties";
 
-
-    public NotificationService(){
-        try(FileInputStream input = new FileInputStream(this.propertiesFilePath)){
-            smtpProps.load(input);
-            System.out.println("Notification Service Started Successfully");
-        }catch(IOException e){
-            throw new RuntimeException("Failed to load SMTP config file", e );
-        }
+    public static void sendReservationCreationNotification(String to, Reservation reservationDetails) {
+        String subject = "CLEB Reservation Created Successfully";
+        String content = "<h1>Reservation Confirmation</h1>" +
+                "<p>Your reservation has been created with the following details:</p>" +
+                "<p>" + reservationDetails + "</p>";
+        SMTPUtil.sendEmail(to, subject, content);
     }
 
+    public static void sendReservationModificationNotification(String to, Reservation reservationDetails) {
+        String subject = "CLEB Reservation Modified Successfully";
+        String content = "<h1>Reservation Modification</h1>" +
+                "<p>Your reservation has been updated. The new details are:</p>" +
+                "<p>" + reservationDetails + "</p>";
+        SMTPUtil.sendEmail(to, subject, content);
+    }
 
-    public void sendEmail(String to, String subject, String content){
-        String username = smtpProps.getProperty("mail.username");
-        String password = smtpProps.getProperty("mail.appPassword");
+    public static void sendReservationDeletionNotification(String to, Reservation reservationId) {
+        String subject = "CLEB Reservation Cancelled";
+        String content = "<h1>Reservation Cancellation</h1>" +
+                "<p>Your reservation with ID: " + reservationId + " has been cancelled.</p>";
+        SMTPUtil.sendEmail(to, subject, content);
+    }
 
-        Properties props = new Properties();
-        props.put("mail.smtp.auth", smtpProps.getProperty("mail.smtp.auth"));
-        props.put("mail.smtp.starttls.enable", smtpProps.getProperty("mail.smtp.starttls.enable"));
-        props.put("mail.smtp.host", smtpProps.getProperty("mail.smtp.host"));
-        props.put("mail.smtp.port", smtpProps.getProperty("mail.smtp.port"));
+    public static void sendAccountCreationNotification(User modificationDetails) {
+        String subject = "CLEB Account Creation";
+        String content = "<h1>Account Created</h1>" +
+                "<p>Your account information has been added:</p>" +
+                "<p>" + modificationDetails + "</p>" +
+                "<p>If you did not request this action, please contact support immediately.</p>";
+        SMTPUtil.sendEmail(modificationDetails.getEmail(), subject, content);
+    }
 
-        Session session = Session.getInstance(props, new Authenticator() {
-            protected PasswordAuthentication getPasswordAuthentication() {
-                return new PasswordAuthentication(username, password);
-            }
-        });
-
-        try{
-            Message message = new MimeMessage(session);
-            message.setFrom(new InternetAddress(username));
-            message.setRecipients(
-                    Message.RecipientType.TO, InternetAddress.parse(to));
-            message.setSubject(subject);
-            message.setContent(content, "text/html; charset=utf-8");
-
-            Transport.send(message);
-            System.out.println("Email Sent to " + to);//TO BE REPLACED WITH A LOGGER
-
-        }catch (MessagingException e){
-            System.err.println("Failed to send email " + e.getMessage());//TO BE REPLACED WITH A LOGGER
-            e.printStackTrace();
-        }
+    public static void sendAccountModificationNotification(User modificationDetails) {
+        String subject = "CLEB Account Details Updated";
+        String content = "<h1>Account Update</h1>" +
+                "<p>Your account information has been modified:</p>" +
+                "<p>" + modificationDetails + "</p>" +
+                "<p>If you did not perform this action, please contact support immediately.</p>";
+        SMTPUtil.sendEmail(modificationDetails.getEmail(), subject, content);
     }
 }
