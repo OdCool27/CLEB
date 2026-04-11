@@ -1,6 +1,7 @@
 package server.dao;
 
 import server.model.Equipment;
+import server.model.Lab;
 import server.model.Location;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -188,7 +189,7 @@ public class EquipmentDAO {
         String status = rs.getString("status");
         
 
-        Location location = new Location();
-        return new Equipment(equipmentID, description, location, status);
+        Lab lab = new Lab();
+        return new Equipment(equipmentID, description, lab, status);
     }
 }

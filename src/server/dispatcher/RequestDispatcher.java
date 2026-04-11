@@ -14,8 +14,8 @@ public class RequestDispatcher {
     private Map<String, RequestHandler<?>> handlers = new HashMap<>();
 
     public RequestDispatcher(){
-        handlers.put("LOGIN", new LoginHandler());
-        handlers.put("UPDATE_PROFILE", new UserHandler());
+        //handlers.put("LOGIN", new LoginHandler());
+        //handlers.put("UPDATE_PROFILE", new UserHandler());
     }
 
     public ResponseEnvelope<?> dispatch(RequestEnvelope requestEnvelope, Connection conn){
