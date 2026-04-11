@@ -1,5 +1,6 @@
 package server.model;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -16,9 +17,9 @@ public class Employee extends User {
     }
 
     public Employee(int userID, String firstName, String lastName, String email,
-                    String passwordHash, Role role, boolean isActivated,
+                    String passwordHash, Role role, boolean isActivated, LocalDateTime lastUpdated,
                     String empID, String jobTitle, Set<String> permissions) {
-        super(userID, firstName, lastName, email, passwordHash, role, isActivated);
+        super(userID, firstName, lastName, email, passwordHash, role, isActivated, lastUpdated);
         this.empID = empID;
         this.jobTitle = jobTitle;
         this.permissions = permissions;
