@@ -37,7 +37,7 @@ public class StudentDAO {
             return true;
 
         }catch(SQLException sqle){
-            System.out.println("Failed to initialize table: "+ sqle.getMessage());
+            System.err.println("Failed to initialize table: "+ sqle.getMessage());
         }catch(Exception e){
             e.printStackTrace();
         }
@@ -64,7 +64,7 @@ public class StudentDAO {
                 return rowsInserted > 0;
 
             } catch (SQLException sqle) {
-                System.out.println("Failed to save student: " + sqle.getMessage());
+                System.err.println("Failed to save student: " + sqle.getMessage());
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -104,7 +104,7 @@ public class StudentDAO {
                         userRole, active, lastUpdated, studentID, faculty, school);
             }
         }catch(SQLException sqle){
-            System.out.println("Failed to get Student: " + sqle.getMessage());
+            System.err.println("Failed to get Student: " + sqle.getMessage());
         }catch(Exception e){
             e.printStackTrace();
         }
@@ -141,7 +141,7 @@ public class StudentDAO {
                         userRole, active, lastUpdated, studentID, faculty, school);
             }
         }catch(SQLException sqle){
-            System.out.println("Failed to get Student: " + sqle.getMessage());
+            System.err.println("Failed to get Student: " + sqle.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -180,7 +180,7 @@ public class StudentDAO {
             return students;
 
         }catch(SQLException sqle){
-            System.out.println("Failed to get All Students: " + sqle.getMessage());
+            System.err.println("Failed to get All Students: " + sqle.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -211,7 +211,7 @@ public class StudentDAO {
             return studentUpdated || userUpdated; //IF SOMETHING IS UPDATED THEN RETURN TRUE
 
         }catch(SQLException sqle){
-            System.out.println("Failed to update Student: " + sqle.getMessage());
+            System.err.println("Failed to update Student: " + sqle.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -221,7 +221,7 @@ public class StudentDAO {
 
     //----------------------------- DELETE OPERATIONS --------------------------------------------
 
-    //DELETE A SINGLE USER BY ID - No Need to call User Delete Method since the table has Casacade on delete
+    //DELETE A SINGLE STUDENT BY ID - No Need to call User Delete Method since the table has Casacade on delete
     public boolean deleteStudentById(String studentID){
         String sql = "DELETE FROM Student WHERE studentID = ?";
 
@@ -232,7 +232,7 @@ public class StudentDAO {
             return rowsDeleted > 0;
 
         }catch(SQLException sqle){
-            System.out.println("Failed to delete Student: " + sqle.getMessage());
+            System.err.println("Failed to delete Student: " + sqle.getMessage());
         }catch (Exception e){
             e.printStackTrace();
         }
@@ -250,7 +250,7 @@ public class StudentDAO {
             return rowsDeleted > 0;
 
         }catch(SQLException sqle){
-            System.out.println("Failed to delete All Students: " + sqle.getMessage());
+            System.err.println("Failed to delete All Students: " + sqle.getMessage());
         }
 
         return false;

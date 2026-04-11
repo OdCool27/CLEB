@@ -35,6 +35,17 @@ import java.time.LocalDateTime;public abstract class User {
         this.lastUpdated = lastUpdated;
     }
 
+    public User(User user){
+        this.userID = user.userID;
+        this.firstName = user.firstName;
+        this.lastName = user.lastName;
+        this.email = user.email;
+        this.passwordHash = user.passwordHash;
+        this.role = user.role;
+        this.isActive = user.isActive;
+        this.lastUpdated = user.lastUpdated;
+    }
+
     public int getUserID() {
         return userID;
     }

@@ -8,6 +8,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -16,201 +17,247 @@ import java.util.Set;
 
 public class EmployeeDAO {
     private Connection conn;
+    private UserDAO userDAO;
 
     public EmployeeDAO(Connection conn) {
         this.conn = conn;
-        LoggingUtil.debug(EmployeeDAO.class, "EmployeeDAO initialized with connection");
+        this.userDAO = new UserDAO(conn);
     }
-    
 
-public boolean insertEmployee(Employee employee) {
-    String query = "INSERT INTO employees (userID, empID, jobTitle, empPermissions) " +
-                   "VALUES (?, ?, ?, ?)";
-    
-    try {
-        LoggingUtil.debug(EmployeeDAO.class, "Inserting employee into database: {}", employee.getEmpID());
-        PreparedStatement pstmt = conn.prepareStatement(query);
-        pstmt.setInt(1, employee.getUserID());
-        pstmt.setString(2, employee.getEmpID());
-        pstmt.setString(3, employee.getJobTitle());
-        pstmt.setString(4, serializePermissions(employee.getPermissions()));
-        
-        int rowsAffected = pstmt.executeUpdate();
-        LoggingUtil.info(EmployeeDAO.class, "Employee inserted successfully: {}", employee.getEmpID());
-        return rowsAffected > 0;
-        
-    } catch (SQLException e) {
-        LoggingUtil.error(EmployeeDAO.class, "SQLException while inserting employee: {}", e, employee.getEmpID());
-        return false;
-    } catch (Exception e) {
-        LoggingUtil.error(EmployeeDAO.class, "Unexpected exception while inserting employee: {}", e, employee.getEmpID());
-        return false;
-    }
-}
-    
 
-public Employee getEmployeeById(int userID) {
-    String query = "SELECT * FROM employees WHERE userID = ?";
-    
-    try {
-        LoggingUtil.debug(EmployeeDAO.class, "Fetching employee from database with user ID: {}", userID);
-        PreparedStatement pstmt = conn.prepareStatement(query);
-        pstmt.setInt(1, userID);
-        
-        ResultSet rs = pstmt.executeQuery();
-        
-        if (rs.next()) {
-            LoggingUtil.debug(EmployeeDAO.class, "Employee found in database: {}", userID);
-            return mapResultSetToEmployee(rs);
-        } else {
-            LoggingUtil.warn(EmployeeDAO.class, "Employee not found in database: {}", userID);
-            return null;
+    //INITIALIZES STUDENT TABLE
+    public boolean initializeTable(){
+        userDAO.initializeTable();//initializes user table first
+
+        String sql = "CREATE TABLE IF NOT EXISTS Employee (" +
+                "userID INT PRIMARY KEY NOT NULL, " +
+                "empID VARCHAR(6) NOT NULL UNIQUE, " +
+                "jobTitle VARCHAR(50) NOT NULL, " +
+                "FOREIGN KEY (userID) REFERENCES `User`(userID) ON DELETE CASCADE " +
+                ");";
+
+        try(PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.execute();
+            return true;
+
+        }catch(SQLException sqle){
+            System.err.println("Failed to initialize table: "+ sqle.getMessage());
+        }catch(Exception e){
+            e.printStackTrace();
         }
-        
-    } catch (SQLException e) {
-        LoggingUtil.error(EmployeeDAO.class, "SQLException while fetching employee: {}", e, userID);
-        return null;
-    } catch (Exception e) {
-        LoggingUtil.error(EmployeeDAO.class, "Unexpected exception while fetching employee: {}", e, userID);
-        return null;
-    }
-}
-    
 
-public Employee getEmployeeByEmpID(String empID) {
-    String query = "SELECT * FROM employees WHERE empID = ?";
-    
-    try {
-        LoggingUtil.debug(EmployeeDAO.class, "Fetching employee from database with employee ID: {}", empID);
-        PreparedStatement pstmt = conn.prepareStatement(query);
-        pstmt.setString(1, empID);
-        
-        ResultSet rs = pstmt.executeQuery();
-        
-        if (rs.next()) {
-            LoggingUtil.debug(EmployeeDAO.class, "Employee found in database: {}", empID);
-            return mapResultSetToEmployee(rs);
-        } else {
-            LoggingUtil.warn(EmployeeDAO.class, "Employee not found in database: {}", empID);
-            return null;
-        }
-        
-    } catch (SQLException e) {
-        LoggingUtil.error(EmployeeDAO.class, "SQLException while fetching employee: {}", e, empID);
-        return null;
-    } catch (Exception e) {
-        LoggingUtil.error(EmployeeDAO.class, "Unexpected exception while fetching employee: {}", e, empID);
-        return null;
-    }
-}
-    
- List<Employee> getAllEmployees() {
-    String query = "SELECT * FROM employees";
-    List<Employee> employees = new ArrayList<>();
-    
-    try {
-        LoggingUtil.debug(EmployeeDAO.class, "Fetching all employees from database");
-        Statement stmt = conn.createStatement();
-        ResultSet rs = stmt.executeQuery(query);
-        
-        while (rs.next()) {
-            Employee employee = mapResultSetToEmployee(rs);
-            employees.add(employee);
-        }
-        
-        LoggingUtil.info(EmployeeDAO.class, "Retrieved {} employees from database", employees.size());
-        return employees;
-        
-    } catch (SQLException e) {
-        LoggingUtil.error(EmployeeDAO.class, "SQLException while fetching all employees", e);
-        return employees;
-    } catch (Exception e) {
-        LoggingUtil.error(EmployeeDAO.class, "Unexpected exception while fetching all employees", e);
-        return employees;
-    }
-}
-    
-
-public boolean updateEmployee(Employee employee) {
-    String query = "UPDATE employees SET empID = ?, jobTitle = ?, empPermissions = ? WHERE userID = ?";
-    
-    try {
-        LoggingUtil.debug(EmployeeDAO.class, "Updating employee in database: {}", employee.getEmpID());
-        PreparedStatement pstmt = conn.prepareStatement(query);
-        pstmt.setString(1, employee.getEmpID());
-        pstmt.setString(2, employee.getJobTitle());
-        pstmt.setString(3, serializePermissions(employee.getPermissions()));
-        pstmt.setInt(4, employee.getUserID());
-        
-        int rowsAffected = pstmt.executeUpdate();
-        LoggingUtil.info(EmployeeDAO.class, "Employee updated successfully: {}", employee.getEmpID());
-        return rowsAffected > 0;
-        
-    } catch (SQLException e) {
-        LoggingUtil.error(EmployeeDAO.class, "SQLException while updating employee: {}", e, employee.getEmpID());
-        return false;
-    } catch (Exception e) {
-        LoggingUtil.error(EmployeeDAO.class, "Unexpected exception while updating employee: {}", e, employee.getEmpID());
         return false;
     }
-}
-    
-/**
- * Deletes an employee from the database.
- * 
- * @param userID the user ID of the employee to delete
- * @return true if deletion was successful, false otherwise
- */
-public boolean deleteEmployee(int userID) {
-    String query = "DELETE FROM employees WHERE userID = ?";
-    
-    try {
-        LoggingUtil.debug(EmployeeDAO.class, "Deleting employee from database: {}", userID);
-        PreparedStatement pstmt = conn.prepareStatement(query);
-        pstmt.setInt(1, userID);
-        
-        int rowsAffected = pstmt.executeUpdate();
-        LoggingUtil.info(EmployeeDAO.class, "Employee deleted successfully: {}", userID);
-        return rowsAffected > 0;
-        
-    } catch (SQLException e) {
-        LoggingUtil.error(EmployeeDAO.class, "SQLException while deleting employee: {}", e, userID);
-        return false;
-    } catch (Exception e) {
-        LoggingUtil.error(EmployeeDAO.class, "Unexpected exception while deleting employee: {}", e, userID);
-        return false;
-    }
-}
-    
 
-private Employee mapResultSetToEmployee(ResultSet rs) throws SQLException {
-    LoggingUtil.debug(EmployeeDAO.class, "Mapping ResultSet to Employee object");
-    
-    int userID = rs.getInt("userID");
-    String empID = rs.getString("empID");
-    String jobTitle = rs.getString("jobTitle");
-    Set<String> permissions = deserializePermissions(rs.getString("empPermissions"));
-    
-    // Note: User details should be fetched via UserDAO
-    return new Employee(userID, "", "", "", "", User.Role.TECHNICIAN, true, empID, jobTitle, permissions);
-}
-    
 
-    private String serializePermissions(Set<String> permissions) {
-        if (permissions == null || permissions.isEmpty()) {
-            return "";
-        }
-        return String.join(",", permissions);
-    }
+    //-------------------------------------- CREATE OPERATION--------------------------------------
 
-    private Set<String> deserializePermissions(String permissionsStr) {
-        Set<String> permissions = new HashSet<>();
-        if (permissionsStr != null && !permissionsStr.isEmpty()) {
-            String[] perms = permissionsStr.split(",");
-            for (String perm : perms) {
-                permissions.add(perm.trim());
+    //CREATES EMPLOYEE RECORD
+    public boolean saveEmployee(Employee employee){
+        initializeTable(); //Ensures that User table is created.
+
+        if(userDAO.saveUser(employee)){
+            String sql = "INSERT INTO Employee (userID, empID, jobTitle) VALUES (?, ?, ?)";
+
+            try(PreparedStatement pstmt = conn.prepareStatement(sql)){
+                pstmt.setInt(1, employee.getUserID());
+                pstmt.setString(2, employee.getEmpID());
+                pstmt.setString(3, employee.getJobTitle());
+
+                int rowsInserted = pstmt.executeUpdate();
+                return rowsInserted > 0;
+
+            }catch(SQLException sqle){
+                System.err.println("Failed to save employee: "+ sqle.getMessage());
+            }catch(Exception e){
+                e.printStackTrace();
             }
         }
-        return permissions;
+        return false;
     }
+
+
+    //------------------------------------------ RETRIEVE OPERATION ------------------------------------
+
+    //RETRIEVES EMPLOYEE RECORD BY EMPLOYEE ID
+    public Employee getEmployeeById(String inputtedEmpID){
+        String sql = "SELECT * " +
+                "FROM `User` u " +
+                "INNER JOIN Emploee emp ON u.userID = emp.userID " +
+                "WHERE emp.empID = ?";
+
+        try(PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.setString(1, inputtedEmpID);
+
+            ResultSet rs = pstmt.executeQuery();
+
+            while(rs.next()){
+                int userID = rs.getInt("userID");
+                String firstName = rs.getString("firstName");
+                String lastName = rs.getString("lastName");
+                String email = rs.getString("email");
+                String passwordHash = rs.getString("passwordHash");
+                User.Role userRole = User.Role.valueOf(rs.getString("role"));
+                boolean active = rs.getBoolean("active");
+                LocalDateTime lastUpdated = rs.getTimestamp("lastUpdated").toLocalDateTime();
+
+                String empID = rs.getString("empID");
+                String jobTitle = rs.getString("jobTitle");
+
+                return new Employee(userID, firstName, lastName, email, passwordHash, userRole, active, lastUpdated,
+                        empID, jobTitle);
+            }
+
+        }catch(SQLException sqle){
+            System.err.println("Failed to get employee by ID: "+ sqle.getMessage());
+        }
+
+        return null;
+    }
+
+
+    //RETRIEVES EMPLOYEE RECORD BY EMAIL
+    public Employee getEmployeeByEmail(String inputtedEmail){
+        String sql = "SELECT * " +
+                "FROM `User` u " +
+                "INNER JOIN Emploee emp ON u.userID = emp.userID " +
+                "WHERE u.email = ?";
+
+        try(PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.setString(1, inputtedEmail);
+
+            ResultSet rs = pstmt.executeQuery();
+
+            while(rs.next()){
+                int userID = rs.getInt("userID");
+                String firstName = rs.getString("firstName");
+                String lastName = rs.getString("lastName");
+                String email = rs.getString("email");
+                String passwordHash = rs.getString("passwordHash");
+                User.Role userRole = User.Role.valueOf(rs.getString("role"));
+                boolean active = rs.getBoolean("active");
+                LocalDateTime lastUpdated = rs.getTimestamp("lastUpdated").toLocalDateTime();
+
+                String empID = rs.getString("empID");
+                String jobTitle = rs.getString("jobTitle");
+
+                return new Employee(userID, firstName, lastName, email, passwordHash, userRole, active, lastUpdated,
+                        empID, jobTitle);
+            }
+
+        }catch(SQLException sqle){
+            System.err.println("Failed to get employee by Email: "+ sqle.getMessage());
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+
+    //RETRIEVE ALL EMPLOYEES
+    public List<Employee> getAllEmployees(){
+        List<Employee> employees = new ArrayList<>();
+        String sql = "SELECT * FROM `User` u INNER JOIN Employee emp on u.userID = emp.userID";
+
+        try(PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            ResultSet rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                int userID = rs.getInt("userID");
+                String firstName = rs.getString("firstName");
+                String lastName = rs.getString("lastName");
+                String email = rs.getString("email");
+                String passwordHash = rs.getString("passwordHash");
+                User.Role userRole = User.Role.valueOf(rs.getString("role"));
+                boolean active = rs.getBoolean("active");
+                LocalDateTime lastUpdated = rs.getTimestamp("lastUpdated").toLocalDateTime();
+
+                String empID = rs.getString("empID");
+                String jobTitle = rs.getString("jobTitle");
+
+                Employee emp = new Employee(userID, firstName, lastName, email, passwordHash, userRole, active, lastUpdated,
+                        empID, jobTitle);
+
+                employees.add(emp);
+            }
+
+            return employees;
+
+        }catch(SQLException sqle){
+            System.err.println("Failed to get employee by ID: "+ sqle.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return employees;
+    }
+
+    //------------------------------------------- UPDATE OPERATIONS ----------------------------------------
+
+    //UPDATES EMPLOYEE RECORD
+    public boolean updateEmployee(Employee employee){
+        boolean userUpdated = userDAO.updateUser(employee);
+
+        String sql = "UPDATE Employee SET " +
+                "jobTitle = ?, " +
+                "WHERE empID = ?";
+
+        try(PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.setString(1, employee.getJobTitle());
+            pstmt.setString(2, employee.getEmpID());
+
+            int rowsUpdated = pstmt.executeUpdate();
+            boolean studentUpdated = rowsUpdated > 0;
+
+            return studentUpdated || userUpdated; //IF SOMETHING IS UPDATED THEN RETURN TRUE
+
+        }catch(SQLException sqle){
+            System.err.println("Failed to update Student: " + sqle.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return false;
+    }
+
+
+    //------------------------------------------- DELETE OPERATIONS ----------------------------------------
+
+    //DELETE A SINGLE Employee BY ID - No Need to call User Delete Method since the table has Casacade on delete
+    public boolean deleteEmployeeById(String empID){
+        String sql = "DELETE FROM Employee WHERE empID = ?";
+
+        try(PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.setString(1, empID);
+
+            int rowsDeleted = pstmt.executeUpdate();
+            return rowsDeleted > 0;
+
+        }catch(SQLException sqle){
+            System.err.println("Failed to delete Employee: " + sqle.getMessage());
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
+        return false;
+    }
+
+    //DELETE ALL EMPLOYEES
+    public boolean deleteAllEmployees(){
+        String sql = "DELETE FROM Employee";
+
+        try(PreparedStatement pstmt = conn.prepareStatement(sql)){
+            int rowsDeleted = pstmt.executeUpdate();
+
+            return rowsDeleted > 0;
+
+        }catch(SQLException sqle){
+            System.err.println("Failed to delete All Employees: " + sqle.getMessage());
+        }
+
+        return false;
+    }
+
 }

@@ -7,22 +7,19 @@ import java.util.Set;
 public class Employee extends User {
     private String empID;
     private String jobTitle;
-    private Set<String> permissions;
 
     public Employee() {
         super();
         empID = "";
         jobTitle = "";
-        permissions = new HashSet<>();
     }
 
     public Employee(int userID, String firstName, String lastName, String email,
                     String passwordHash, Role role, boolean isActivated, LocalDateTime lastUpdated,
-                    String empID, String jobTitle, Set<String> permissions) {
+                    String empID, String jobTitle) {
         super(userID, firstName, lastName, email, passwordHash, role, isActivated, lastUpdated);
         this.empID = empID;
         this.jobTitle = jobTitle;
-        this.permissions = permissions;
     }
 
     public String getEmpID() {
@@ -41,13 +38,6 @@ public class Employee extends User {
         this.jobTitle = jobTitle;
     }
 
-    public Set<String> getPermissions() {
-        return permissions;
-    }
-
-    public void setPermission(Set<String> permissions) {
-        this.permissions = permissions;
-    }
 
     @Override
     public String toString() {
@@ -56,7 +46,6 @@ public class Employee extends User {
                 "Full Name: " + firstName + " " + lastName + "\n" +
                 "Email: " + email + "\n" +
                 "Role: " + role + "\n" +
-                "Permissions: " + permissions + "\n" +
                 "Active: " + isActive + "\n";
     }
 }
