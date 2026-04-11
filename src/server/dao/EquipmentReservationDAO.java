@@ -2,9 +2,11 @@ package server.dao;
 
 import server.model.EquipmentReservation;
 import server.model.Equipment;
-import server.model.Location;
+import server.model.Reservation;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -15,320 +17,326 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-
 public class EquipmentReservationDAO {
     private static final Logger logger = LogManager.getLogger(EquipmentReservationDAO.class);
-    private Connection conn;
+    private final Connection conn;
 
     public EquipmentReservationDAO(Connection conn) {
         this.conn = conn;
-        logger.debug("EquipmentReservationDAO initialized with connection");
     }
-    
-   
-    public boolean insertEquipmentReservation(int studentUserID, String equipmentID, LocalDateTime reservationDateTime,
-                                             int durationInHours, String approvalStatus, Integer approvedByEmployeeID) {
-        String query = "INSERT INTO equipmentReservations (studentUserID, equipmentID, reservationDateTime, durationInHours, " +
-                       "approvalStatus, approvedByEmployeeID, lastUpdated) VALUES (?, ?, ?, ?, ?, ?, ?)";
-        
-        try {
-            logger.debug("Inserting equipment reservation into database: student {}, equipment {}, datetime {}", 
-                        studentUserID, equipmentID, reservationDateTime);
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, studentUserID);
-            pstmt.setString(2, equipmentID);
-            pstmt.setTimestamp(3, Timestamp.valueOf(reservationDateTime));
-            pstmt.setInt(4, durationInHours);
-            pstmt.setString(5, approvalStatus);
-            if (approvedByEmployeeID != null) {
-                pstmt.setInt(6, approvedByEmployeeID);
+
+    // INITIALIZES EQUIPMENT RESERVATION TABLE IN DATABASE
+    public boolean initializeTable() {
+        String sql = "CREATE TABLE IF NOT EXISTS `EquipmentReservation` ("
+                + "reservationID INT PRIMARY KEY NOT NULL AUTO_INCREMENT, "
+                + "studentID VARCHAR(20) NOT NULL, "
+                + "dateTime DATETIME NOT NULL, "
+                + "durationInHours INT NOT NULL, "
+                + "approvalStatus VARCHAR(20) NOT NULL, "
+                + "approvedBy VARCHAR(50), "
+                + "lastUpdated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                + "equipmentID VARCHAR(20) NOT NULL"
+                + ");";
+
+        try (PreparedStatement dbStmt = conn.prepareStatement(sql)) {
+            dbStmt.execute();
+            return true;
+        } catch (SQLException sqle) {
+            logger.error("Failed to initialize EquipmentReservation table", sqle);
+        } catch (Exception e) {
+            logger.error("Unexpected error while initializing EquipmentReservation table", e);
+        }
+        return false;
+    }
+
+    // CREATE EQUIPMENT RESERVATION RECORD IN DB
+    public boolean saveEquipmentReservation(EquipmentReservation equipRes) {
+        String sql = "INSERT INTO `EquipmentReservation` "
+                + "(studentID, dateTime, durationInHours, approvalStatus, approvedBy, lastUpdated, equipmentID) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setString(1, equipRes.getStudentID());
+            pstmt.setTimestamp(2, Timestamp.valueOf(equipRes.getDateTime()));
+            pstmt.setInt(3, equipRes.getDurationInHours());
+            pstmt.setString(4, equipRes.getApprovalStatus().name());
+            pstmt.setString(5, equipRes.getApprovedBy());
+
+            if (equipRes.getLastUpdated() != null) {
+                pstmt.setTimestamp(6, Timestamp.valueOf(equipRes.getLastUpdated()));
             } else {
-                pstmt.setNull(6, java.sql.Types.INTEGER);
+                pstmt.setTimestamp(6, Timestamp.valueOf(LocalDateTime.now()));
             }
-            pstmt.setTimestamp(7, Timestamp.valueOf(LocalDateTime.now()));
-            
+
+            pstmt.setString(7, equipRes.getReservedItem().getEquipmentID());
+
             int rowsAffected = pstmt.executeUpdate();
-            logger.info("Equipment reservation inserted successfully");
-            return rowsAffected > 0;
-            
+            if (rowsAffected > 0) {
+                try (ResultSet rs = pstmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        int generatedID = rs.getInt(1);
+                        equipRes.setReservationID(generatedID);
+                    }
+                }
+                logger.info("Equipment reservation saved successfully for student: {}", equipRes.getStudentID());
+                return true;
+            }
+
         } catch (SQLException e) {
             logger.error("SQLException while inserting equipment reservation", e);
-            return false;
         } catch (Exception e) {
             logger.error("Unexpected exception while inserting equipment reservation", e);
-            return false;
         }
+        return false;
     }
-    
 
-    public EquipmentReservation getEquipmentReservationByCompositeKey(int studentUserID, String equipmentID, LocalDateTime reservationDateTime) {
-        String query = "SELECT * FROM equipmentReservations WHERE studentUserID = ? AND equipmentID = ? AND reservationDateTime = ?";
-        
-        try {
-            logger.debug("Fetching equipment reservation by composite key");
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, studentUserID);
-            pstmt.setString(2, equipmentID);
-            pstmt.setTimestamp(3, Timestamp.valueOf(reservationDateTime));
-            
-            ResultSet rs = pstmt.executeQuery();
-            
-            if (rs.next()) {
-                logger.debug("Equipment reservation found in database");
-                return mapResultSetToEquipmentReservation(rs);
-            } else {
-                logger.warn("Equipment reservation not found in database");
-                return null;
+    public EquipmentReservation getEquipmentReservationById(int reservationID) {
+        String query = "SELECT * FROM `EquipmentReservation` WHERE reservationID = ?";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setInt(1, reservationID);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    logger.info("Retrieved equipment reservation by ID: {}", reservationID);
+                    return mapResultSetToEquipmentReservation(rs);
+                }
             }
-            
+
+            logger.warn("Equipment reservation not found for ID: {}", reservationID);
         } catch (SQLException e) {
             logger.error("SQLException while fetching equipment reservation", e);
-            return null;
         } catch (Exception e) {
             logger.error("Unexpected exception while fetching equipment reservation", e);
-            return null;
         }
+        return null;
     }
-    
-    /**
-     * Retrieves all equipment reservations for a specific student from the database.
-     * 
-     * @param studentUserID the student user ID
-     * @return a list of EquipmentReservation objects, empty list if none found
-     */
-    public List<EquipmentReservation> getReservationsByStudentId(int studentUserID) {
-        String query = "SELECT * FROM equipmentReservations WHERE studentUserID = ? ORDER BY reservationDateTime DESC";
+
+    public List<EquipmentReservation> getReservationsByStudentId(String studentID) {
+        String query = "SELECT * FROM `EquipmentReservation` WHERE studentID = ? ORDER BY dateTime DESC";
         List<EquipmentReservation> reservations = new ArrayList<>();
-        
-        try {
-            logger.debug("Fetching equipment reservations for student: {}", studentUserID);
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, studentUserID);
-            
-            ResultSet rs = pstmt.executeQuery();
-            
-            while (rs.next()) {
-                EquipmentReservation reservation = mapResultSetToEquipmentReservation(rs);
-                reservations.add(reservation);
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setString(1, studentID);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    reservations.add(mapResultSetToEquipmentReservation(rs));
+                }
             }
-            
-            logger.info("Retrieved {} equipment reservations for student: {}", reservations.size(), studentUserID);
-            return reservations;
-            
+
+            logger.info("Retrieved {} equipment reservations for student: {}", reservations.size(), studentID);
         } catch (SQLException e) {
-            logger.error("SQLException while fetching equipment reservations for student: {}", studentUserID, e);
-            return reservations;
+            logger.error("SQLException while fetching equipment reservations for student: {}", studentID, e);
         } catch (Exception e) {
-            logger.error("Unexpected exception while fetching equipment reservations for student: {}", studentUserID, e);
-            return reservations;
+            logger.error("Unexpected exception while fetching equipment reservations for student: {}", studentID, e);
         }
+
+        return reservations;
     }
-    
-    /**
-     * Retrieves all equipment reservations with a specific approval status from the database.
-     * 
-     * @param status the approval status
-     * @return a list of EquipmentReservation objects, empty list if none found
-     */
+
     public List<EquipmentReservation> getReservationsByStatus(String status) {
-        String query = "SELECT * FROM equipmentReservations WHERE approvalStatus = ? ORDER BY reservationDateTime DESC";
+        String query = "SELECT * FROM `EquipmentReservation` WHERE approvalStatus = ? ORDER BY dateTime DESC";
         List<EquipmentReservation> reservations = new ArrayList<>();
-        
-        try {
-            logger.debug("Fetching equipment reservations with status: {}", status);
-            PreparedStatement pstmt = conn.prepareStatement(query);
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setString(1, status);
-            
-            ResultSet rs = pstmt.executeQuery();
-            
-            while (rs.next()) {
-                EquipmentReservation reservation = mapResultSetToEquipmentReservation(rs);
-                reservations.add(reservation);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    reservations.add(mapResultSetToEquipmentReservation(rs));
+                }
             }
-            
+
             logger.info("Retrieved {} equipment reservations with status: {}", reservations.size(), status);
-            return reservations;
-            
         } catch (SQLException e) {
             logger.error("SQLException while fetching equipment reservations by status: {}", status, e);
-            return reservations;
         } catch (Exception e) {
             logger.error("Unexpected exception while fetching equipment reservations by status: {}", status, e);
-            return reservations;
         }
+
+        return reservations;
     }
-    
- 
-    public List<EquipmentReservation> getReservationsByApprovedBy(int approvedByEmployeeID) {
-        String query = "SELECT * FROM equipmentReservations WHERE approvedByEmployeeID = ? ORDER BY reservationDateTime DESC";
+
+    public List<EquipmentReservation> getReservationsByApprovedBy(String approvedBy) {
+        String query = "SELECT * FROM `EquipmentReservation` WHERE approvedBy = ? ORDER BY dateTime DESC";
         List<EquipmentReservation> reservations = new ArrayList<>();
-        
-        try {
-            logger.debug("Fetching equipment reservations approved by employee: {}", approvedByEmployeeID);
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, approvedByEmployeeID);
-            
-            ResultSet rs = pstmt.executeQuery();
-            
-            while (rs.next()) {
-                EquipmentReservation reservation = mapResultSetToEquipmentReservation(rs);
-                reservations.add(reservation);
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setString(1, approvedBy);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    reservations.add(mapResultSetToEquipmentReservation(rs));
+                }
             }
-            
-            logger.info("Retrieved {} equipment reservations approved by employee: {}", reservations.size(), approvedByEmployeeID);
-            return reservations;
-            
+
+            logger.info("Retrieved {} equipment reservations approved by: {}", reservations.size(), approvedBy);
         } catch (SQLException e) {
-            logger.error("SQLException while fetching equipment reservations by approved employee: {}", approvedByEmployeeID, e);
-            return reservations;
+            logger.error("SQLException while fetching equipment reservations by approver: {}", approvedBy, e);
         } catch (Exception e) {
-            logger.error("Unexpected exception while fetching equipment reservations by approved employee: {}", approvedByEmployeeID, e);
-            return reservations;
+            logger.error("Unexpected exception while fetching equipment reservations by approver: {}", approvedBy, e);
         }
+
+        return reservations;
     }
-    
-  
+
     public List<EquipmentReservation> getReservationsByEquipmentId(String equipmentID) {
-        String query = "SELECT * FROM equipmentReservations WHERE equipmentID = ? ORDER BY reservationDateTime DESC";
+        String query = "SELECT * FROM `EquipmentReservation` WHERE equipmentID = ? ORDER BY dateTime DESC";
         List<EquipmentReservation> reservations = new ArrayList<>();
-        
-        try {
-            logger.debug("Fetching equipment reservations for equipment: {}", equipmentID);
-            PreparedStatement pstmt = conn.prepareStatement(query);
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setString(1, equipmentID);
-            
-            ResultSet rs = pstmt.executeQuery();
-            
-            while (rs.next()) {
-                EquipmentReservation reservation = mapResultSetToEquipmentReservation(rs);
-                reservations.add(reservation);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    reservations.add(mapResultSetToEquipmentReservation(rs));
+                }
             }
-            
+
             logger.info("Retrieved {} equipment reservations for equipment: {}", reservations.size(), equipmentID);
-            return reservations;
-            
         } catch (SQLException e) {
             logger.error("SQLException while fetching equipment reservations for equipment: {}", equipmentID, e);
-            return reservations;
         } catch (Exception e) {
             logger.error("Unexpected exception while fetching equipment reservations for equipment: {}", equipmentID, e);
-            return reservations;
         }
+
+        return reservations;
     }
-    
+
+    public List<EquipmentReservation> getReservationsByEquipmentIdAndDate(String equipmentID, LocalDateTime date) {
+        String query = "SELECT * FROM `EquipmentReservation` WHERE equipmentID = ? AND DATE(dateTime) = DATE(?) AND HOUR(dateTime) < 21 ORDER BY dateTime ASC";
+        List<EquipmentReservation> reservations = new ArrayList<>();
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setString(1, equipmentID);
+            pstmt.setTimestamp(2, Timestamp.valueOf(date));
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    reservations.add(mapResultSetToEquipmentReservation(rs));
+                }
+            }
+
+            logger.info("Retrieved {} equipment reservations for equipment: {} on date: {}", reservations.size(), equipmentID, date.toLocalDate());
+        } catch (SQLException e) {
+            logger.error("SQLException while fetching equipment reservations for equipment: {} on date: {}", equipmentID, date.toLocalDate(), e);
+        } catch (Exception e) {
+            logger.error("Unexpected exception while fetching equipment reservations for equipment: {} on date: {}", equipmentID, date.toLocalDate(), e);
+        }
+
+        return reservations;
+    }
 
     public List<EquipmentReservation> getAllEquipmentReservations() {
-        String query = "SELECT * FROM equipmentReservations ORDER BY reservationDateTime DESC";
+        String query = "SELECT * FROM `EquipmentReservation` ORDER BY dateTime DESC";
         List<EquipmentReservation> reservations = new ArrayList<>();
-        
-        try {
-            logger.debug("Fetching all equipment reservations from database");
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery(query);
-            
+
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
             while (rs.next()) {
-                EquipmentReservation reservation = mapResultSetToEquipmentReservation(rs);
-                reservations.add(reservation);
+                reservations.add(mapResultSetToEquipmentReservation(rs));
             }
-            
+
             logger.info("Retrieved {} equipment reservations from database", reservations.size());
-            return reservations;
-            
         } catch (SQLException e) {
             logger.error("SQLException while fetching all equipment reservations", e);
-            return reservations;
         } catch (Exception e) {
             logger.error("Unexpected exception while fetching all equipment reservations", e);
-            return reservations;
         }
+
+        return reservations;
     }
-    
-  
-    public boolean updateEquipmentReservation(int studentUserID, String equipmentID, LocalDateTime reservationDateTime,
-                                             int durationInHours, String approvalStatus, Integer approvedByEmployeeID) {
-        String query = "UPDATE equipmentReservations SET durationInHours = ?, approvalStatus = ?, " +
-                       "approvedByEmployeeID = ?, lastUpdated = ? WHERE studentUserID = ? AND equipmentID = ? AND reservationDateTime = ?";
-        
-        try {
-            logger.debug("Updating equipment reservation in database");
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, durationInHours);
-            pstmt.setString(2, approvalStatus);
-            if (approvedByEmployeeID != null) {
-                pstmt.setInt(3, approvedByEmployeeID);
-            } else {
-                pstmt.setNull(3, java.sql.Types.INTEGER);
-            }
-            pstmt.setTimestamp(4, Timestamp.valueOf(LocalDateTime.now()));
-            pstmt.setInt(5, studentUserID);
-            pstmt.setString(6, equipmentID);
-            pstmt.setTimestamp(7, Timestamp.valueOf(reservationDateTime));
-            
+
+    public boolean updateEquipmentReservation(EquipmentReservation updatedReservation) {
+        String query = "UPDATE `EquipmentReservation` SET "
+                + "studentID = ?, "
+                + "dateTime = ?, "
+                + "durationInHours = ?, "
+                + "approvalStatus = ?, "
+                + "approvedBy = ?, "
+                + "lastUpdated = ?, "
+                + "equipmentID = ? "
+                + "WHERE reservationID = ?";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setString(1, updatedReservation.getStudentID());
+            pstmt.setTimestamp(2, Timestamp.valueOf(updatedReservation.getDateTime()));
+            pstmt.setInt(3, updatedReservation.getDurationInHours());
+            pstmt.setString(4, updatedReservation.getApprovalStatus().name());
+            pstmt.setString(5, updatedReservation.getApprovedBy());
+            pstmt.setTimestamp(6, Timestamp.valueOf(LocalDateTime.now()));
+            pstmt.setString(7, updatedReservation.getReservedItem().getEquipmentID());
+            pstmt.setInt(8, updatedReservation.getReservationID());
+
             int rowsAffected = pstmt.executeUpdate();
-            logger.info("Equipment reservation updated successfully");
+            if (rowsAffected > 0) {
+                logger.info("Equipment reservation updated successfully for ID: {}", updatedReservation.getReservationID());
+            } else {
+                logger.warn("No equipment reservation updated for ID: {}", updatedReservation.getReservationID());
+            }
             return rowsAffected > 0;
-            
+
         } catch (SQLException e) {
             logger.error("SQLException while updating equipment reservation", e);
-            return false;
         } catch (Exception e) {
             logger.error("Unexpected exception while updating equipment reservation", e);
-            return false;
         }
+        return false;
     }
-    
-    /**
-     * Deletes an equipment reservation from the database.
-     * 
-     * @param studentUserID the student user ID
-     * @param equipmentID the equipment ID
-     * @param reservationDateTime the reservation date and time
-     * @return true if deletion was successful, false otherwise
-     */
-    public boolean deleteEquipmentReservation(int studentUserID, String equipmentID, LocalDateTime reservationDateTime) {
-        String query = "DELETE FROM equipmentReservations WHERE studentUserID = ? AND equipmentID = ? AND reservationDateTime = ?";
-        
-        try {
-            logger.debug("Deleting equipment reservation from database");
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, studentUserID);
-            pstmt.setString(2, equipmentID);
-            pstmt.setTimestamp(3, Timestamp.valueOf(reservationDateTime));
-            
+
+    public boolean deleteEquipmentReservation(int reservationID) {
+        String query = "DELETE FROM `EquipmentReservation` WHERE reservationID = ?";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setInt(1, reservationID);
+
             int rowsAffected = pstmt.executeUpdate();
-            logger.info("Equipment reservation deleted successfully");
+            if (rowsAffected > 0) {
+                logger.info("Equipment reservation deleted successfully for ID: {}", reservationID);
+            } else {
+                logger.warn("No equipment reservation deleted for ID: {}", reservationID);
+            }
             return rowsAffected > 0;
-            
+
         } catch (SQLException e) {
             logger.error("SQLException while deleting equipment reservation", e);
-            return false;
         } catch (Exception e) {
             logger.error("Unexpected exception while deleting equipment reservation", e);
-            return false;
         }
+        return false;
     }
-    
 
     private EquipmentReservation mapResultSetToEquipmentReservation(ResultSet rs) throws SQLException {
         logger.debug("Mapping ResultSet to EquipmentReservation object");
-        
-        int studentUserID = rs.getInt("studentUserID");
-        String equipmentID = rs.getString("equipmentID");
-        LocalDateTime reservationDateTime = rs.getTimestamp("reservationDateTime").toLocalDateTime();
+
+        int reservationID = rs.getInt("reservationID");
+        String studentID = rs.getString("studentID");
+        LocalDateTime dateTime = rs.getTimestamp("dateTime").toLocalDateTime();
         int durationInHours = rs.getInt("durationInHours");
         String approvalStatus = rs.getString("approvalStatus");
-        Integer approvedByEmployeeID = rs.getObject("approvedByEmployeeID") != null ? rs.getInt("approvedByEmployeeID") : null;
-        
-        // Create a basic Equipment with equipmentID
+        String approvedBy = rs.getString("approvedBy");
+        String equipmentID = rs.getString("equipmentID");
+
         Equipment equipment = new Equipment();
         equipment.setEquipmentID(equipmentID);
-        
-        // Use placeholder values for reservationID and studentID (from Student.userID)
-        int reservationID = studentUserID; // Placeholder
-        String studentID = String.valueOf(studentUserID); // Placeholder
-        String approvedByStr = approvedByEmployeeID != null ? String.valueOf(approvedByEmployeeID) : "";
-        
-        return new EquipmentReservation(reservationID, studentID, reservationDateTime, durationInHours, 
-                                       server.model.Reservation.ReservationStatus.valueOf(approvalStatus), approvedByStr, equipment);
+
+        EquipmentReservation reservation = new EquipmentReservation(
+                reservationID,
+                studentID,
+                dateTime,
+                durationInHours,
+                Reservation.ReservationStatus.valueOf(approvalStatus),
+                approvedBy,
+                equipment
+        );
+
+        Timestamp lastUpdatedTs = rs.getTimestamp("lastUpdated");
+        if (lastUpdatedTs != null) {
+            reservation.setLastUpdated(lastUpdatedTs.toLocalDateTime());
+        }
+
+        return reservation;
     }
 }

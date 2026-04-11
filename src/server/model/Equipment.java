@@ -4,16 +4,20 @@ public class Equipment {
     private String equipmentID;
     private String description;
     private Lab location;
-    private String status;
+    private EquipStatus status;
+
+    public enum EquipStatus{
+        AVAILABLE, MAINTENANCE, BOOKED
+    }
 
     public Equipment() {
         equipmentID = "";
         description = "";
         location = new Lab();
-        status = "";
+        status = EquipStatus.AVAILABLE;
     }
 
-    public Equipment(String equipmentID, String description, Lab location, String status) {
+    public Equipment(String equipmentID, String description, Lab location, EquipStatus status) {
         this.equipmentID = equipmentID;
         this.description = description;
         this.location = location;
@@ -44,11 +48,11 @@ public class Equipment {
         this.location = location;
     }
 
-    public String getStatus() {
+    public EquipStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(EquipStatus status) {
         this.status = status;
     }
 
@@ -58,6 +62,6 @@ public class Equipment {
                 "Equipment ID: " + equipmentID + "\n" +
                 "Description: " + description + "\n" +
                 "Location: " + location + "\n" +
-                "Status: " + status + "\n";
+                "Status: " + status.toString() + "\n";
     }
 }

@@ -2,7 +2,8 @@ package server.dao;
 
 import server.model.Employee;
 import server.model.User;
-import server.util.LoggingUtil;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -16,6 +17,7 @@ import java.util.Set;
 
 
 public class EmployeeDAO {
+    private static final Logger logger = LogManager.getLogger(EmployeeDAO.class);
     private Connection conn;
     private UserDAO userDAO;
 
@@ -25,9 +27,8 @@ public class EmployeeDAO {
     }
 
 
-    //INITIALIZES STUDENT TABLE
+    //INITIALIZES EMPLOYEE TABLE
     public boolean initializeTable(){
-        userDAO.initializeTable();//initializes user table first
 
         String sql = "CREATE TABLE IF NOT EXISTS Employee (" +
                 "userID INT PRIMARY KEY NOT NULL, " +
@@ -41,9 +42,9 @@ public class EmployeeDAO {
             return true;
 
         }catch(SQLException sqle){
-            System.err.println("Failed to initialize table: "+ sqle.getMessage());
+            logger.error("Failed to initialize Employee table", sqle);
         }catch(Exception e){
-            e.printStackTrace();
+            logger.error("Unexpected error while initializing Employee table", e);
         }
 
         return false;
@@ -54,25 +55,26 @@ public class EmployeeDAO {
 
     //CREATES EMPLOYEE RECORD
     public boolean saveEmployee(Employee employee){
-        initializeTable(); //Ensures that User table is created.
 
-        if(userDAO.saveUser(employee)){
-            String sql = "INSERT INTO Employee (userID, empID, jobTitle) VALUES (?, ?, ?)";
+        String sql = "INSERT INTO Employee (userID, empID, jobTitle) VALUES (?, ?, ?)";
 
-            try(PreparedStatement pstmt = conn.prepareStatement(sql)){
-                pstmt.setInt(1, employee.getUserID());
-                pstmt.setString(2, employee.getEmpID());
-                pstmt.setString(3, employee.getJobTitle());
+        try(PreparedStatement pstmt = conn.prepareStatement(sql)){
+            pstmt.setInt(1, employee.getUserID());
+            pstmt.setString(2, employee.getEmpID());
+            pstmt.setString(3, employee.getJobTitle());
 
-                int rowsInserted = pstmt.executeUpdate();
-                return rowsInserted > 0;
-
-            }catch(SQLException sqle){
-                System.err.println("Failed to save employee: "+ sqle.getMessage());
-            }catch(Exception e){
-                e.printStackTrace();
+            int rowsInserted = pstmt.executeUpdate();
+            if (rowsInserted > 0) {
+                logger.info("Employee saved successfully: {}", employee.getEmpID());
             }
+            return rowsInserted > 0;
+
+        }catch(SQLException sqle){
+            logger.error("Failed to save employee: {}", employee.getEmpID(), sqle);
+        }catch(Exception e){
+            logger.error("Unexpected error while saving employee", e);
         }
+
         return false;
     }
 
@@ -104,12 +106,15 @@ public class EmployeeDAO {
                 String empID = rs.getString("empID");
                 String jobTitle = rs.getString("jobTitle");
 
+                logger.info("Retrieved employee by ID: {}", inputtedEmpID);
                 return new Employee(userID, firstName, lastName, email, passwordHash, userRole, active, lastUpdated,
                         empID, jobTitle);
             }
 
         }catch(SQLException sqle){
-            System.err.println("Failed to get employee by ID: "+ sqle.getMessage());
+            logger.error("Failed to retrieve employee by ID: {}", inputtedEmpID, sqle);
+        } catch (Exception e) {
+            logger.error("Unexpected error while retrieving employee by ID", e);
         }
 
         return null;
@@ -141,14 +146,15 @@ public class EmployeeDAO {
                 String empID = rs.getString("empID");
                 String jobTitle = rs.getString("jobTitle");
 
+                logger.info("Retrieved employee by email: {}", inputtedEmail);
                 return new Employee(userID, firstName, lastName, email, passwordHash, userRole, active, lastUpdated,
                         empID, jobTitle);
             }
 
         }catch(SQLException sqle){
-            System.err.println("Failed to get employee by Email: "+ sqle.getMessage());
+            logger.error("Failed to retrieve employee by email: {}", inputtedEmail, sqle);
         }catch(Exception e){
-            e.printStackTrace();
+            logger.error("Unexpected error while retrieving employee by email", e);
         }
 
         return null;
@@ -183,12 +189,13 @@ public class EmployeeDAO {
                 employees.add(emp);
             }
 
+            logger.info("Retrieved all employees, count: {}", employees.size());
             return employees;
 
         }catch(SQLException sqle){
-            System.err.println("Failed to get employee by ID: "+ sqle.getMessage());
+            logger.error("Failed to retrieve all employees", sqle);
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Unexpected error while retrieving all employees", e);
         }
 
         return employees;
@@ -209,14 +216,18 @@ public class EmployeeDAO {
             pstmt.setString(2, employee.getEmpID());
 
             int rowsUpdated = pstmt.executeUpdate();
-            boolean studentUpdated = rowsUpdated > 0;
+            boolean employeeUpdated = rowsUpdated > 0;
 
-            return studentUpdated || userUpdated; //IF SOMETHING IS UPDATED THEN RETURN TRUE
+            if (employeeUpdated || userUpdated) {
+                logger.info("Employee updated successfully: {}", employee.getEmpID());
+            }
+
+            return employeeUpdated || userUpdated; //IF SOMETHING IS UPDATED THEN RETURN TRUE
 
         }catch(SQLException sqle){
-            System.err.println("Failed to update Student: " + sqle.getMessage());
+            logger.error("Failed to update employee: {}", employee.getEmpID(), sqle);
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Unexpected error while updating employee", e);
         }
 
         return false;
@@ -233,12 +244,15 @@ public class EmployeeDAO {
             pstmt.setString(1, empID);
 
             int rowsDeleted = pstmt.executeUpdate();
+            if (rowsDeleted > 0) {
+                logger.info("Employee deleted successfully: {}", empID);
+            }
             return rowsDeleted > 0;
 
         }catch(SQLException sqle){
-            System.err.println("Failed to delete Employee: " + sqle.getMessage());
+            logger.error("Failed to delete Employee: {}", empID, sqle);
         }catch (Exception e){
-            e.printStackTrace();
+            logger.error("Unexpected error while deleting employee", e);
         }
 
         return false;
@@ -250,11 +264,12 @@ public class EmployeeDAO {
 
         try(PreparedStatement pstmt = conn.prepareStatement(sql)){
             int rowsDeleted = pstmt.executeUpdate();
+            logger.info("Deleted all employees, count: {}", rowsDeleted);
 
             return rowsDeleted > 0;
 
         }catch(SQLException sqle){
-            System.err.println("Failed to delete All Employees: " + sqle.getMessage());
+            logger.error("Failed to delete All Employees", sqle);
         }
 
         return false;

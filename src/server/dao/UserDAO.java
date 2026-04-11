@@ -2,6 +2,8 @@ package server.dao;
 
 import server.dto.UserDTO;
 import server.model.User;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.sql.*;
 import java.time.LocalDateTime;
@@ -9,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class UserDAO {
+    private static final Logger logger = LogManager.getLogger(UserDAO.class);
     private Connection conn;
 
     public UserDAO(Connection conn) {
@@ -33,10 +36,10 @@ public class UserDAO {
             return true;
 
         }catch(SQLException sqle){
-            System.err.println("Failed to initialize User Table : " + sqle.getMessage());
+            logger.error("Failed to initialize User Table", sqle);
 
         }catch(Exception e){
-            e.printStackTrace();
+            logger.error("Unexpected error while initializing User table", e);
         }
         return false;
     }
@@ -67,15 +70,15 @@ public class UserDAO {
                         int generatedID = rs.getInt(1);
                         user.setUserID(generatedID);//Assigns userID to user
                     }
-
+                    logger.info("User saved successfully: {}", user.getEmail());
                     return true;
                 }
             }
 
         }catch(SQLException sqle){
-            System.err.println("Failed to save User : " + sqle.getMessage());
+            logger.error("Failed to save User: {}", user.getEmail(), sqle);
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Unexpected error while saving user", e);
         }
         return false;
     }
@@ -103,15 +106,16 @@ public class UserDAO {
                     boolean active = rs.getBoolean("isActive");
                     LocalDateTime lastUpdated = rs.getTimestamp("lastUpdated").toLocalDateTime();
 
+                    logger.info("Retrieved user by email: {}", inputtedEmail);
                     return new UserDTO(userId, firstName, lastName, email, userRole, active, lastUpdated);
                 }
             }
 
         }catch(SQLException sqle){
-            System.err.println("Failed to get user by email : " + sqle.getMessage());
+            logger.error("Failed to retrieve user by email: {}", inputtedEmail, sqle);
 
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Unexpected error while retrieving user by email", e);
 
         }
 
@@ -137,15 +141,16 @@ public class UserDAO {
                     LocalDateTime lastUpdated = rs.getTimestamp("lastUpdated").toLocalDateTime();
 
 
+                    logger.info("Retrieved user by userID: {}", inputtedUserID);
                     return new UserDTO(userId, firstName, lastName, email, userRole, active, lastUpdated);
                 }
             }
 
         }catch(SQLException sqle){
-            System.err.println("Failed to get user by userID : " + sqle.getMessage());
+            logger.error("Failed to retrieve user by userID: {}", inputtedUserID, sqle);
 
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Unexpected error while retrieving user by ID", e);
 
         }
 
@@ -174,10 +179,11 @@ public class UserDAO {
                 users.add(userDTO);
             }
 
+            logger.info("Retrieved all users, count: {}", users.size());
             return users;
 
         }catch(SQLException sqle){
-            System.err.println("Failed to get users list : " + sqle.getMessage());
+            logger.error("Failed to retrieve users list", sqle);
         }
 
         return null;
@@ -207,10 +213,16 @@ public class UserDAO {
 
             int rowsUpdated = stmt.executeUpdate();
 
+            if (rowsUpdated > 0) {
+                logger.info("User updated successfully: {}", user.getEmail());
+            } else {
+                logger.warn("No user updated for userID: {}", user.getUserID());
+            }
+
             return rowsUpdated > 0;
 
         }catch(SQLException sqle){
-            System.err.println("Failed to update User : " + sqle.getMessage());
+            logger.error("Failed to update User: {}", user.getEmail(), sqle);
         }
 
         return false;
@@ -226,10 +238,15 @@ public class UserDAO {
             stmt.setInt(1, userID);
 
             int rowsDeleted = stmt.executeUpdate();
+            if (rowsDeleted > 0) {
+                logger.info("User deleted successfully, userID: {}", userID);
+            } else {
+                logger.warn("No user found to delete with userID: {}", userID);
+            }
             return rowsDeleted > 0;
 
         }catch(SQLException sqle){
-            System.err.println("Failed to delete User : " + sqle.getMessage());
+            logger.error("Failed to delete User: {}", userID, sqle);
         }
 
         return false;
@@ -240,13 +257,15 @@ public class UserDAO {
         String sql = "DELETE FROM `User`";
 
         try(PreparedStatement stmt = conn.prepareStatement(sql)){
-            return stmt.executeUpdate(); //returns the number of deleted rows
+            int rowsDeleted = stmt.executeUpdate(); //returns the number of deleted rows
+            logger.info("Deleted all users, count: {}", rowsDeleted);
+            return rowsDeleted;
 
         }catch (SQLException e) {
-            System.err.println("Failed to delete all users : " + e.getMessage());
+            logger.error("Failed to delete all users", e);
 
         }catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Unexpected error while deleting all users", e);
 
         }
         return 0;

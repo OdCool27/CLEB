@@ -1,9 +1,11 @@
 package server.dao;
 
-import server.model.LabSeat;
 import server.model.Lab;
+import server.model.LabSeat;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -12,193 +14,217 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
-
 public class LabSeatDAO {
     private static final Logger logger = LogManager.getLogger(LabSeatDAO.class);
-    private Connection conn;
+    private final Connection conn;
 
     public LabSeatDAO(Connection conn) {
         this.conn = conn;
-        logger.debug("LabSeatDAO initialized with connection");
     }
-    
 
-    public boolean insertLabSeat(LabSeat labSeat, String seatCode) {
-        String query = "INSERT INTO labSeats (seatID, labID, seatCode) VALUES (?, ?, ?)";
-        
-        try {
-            logger.debug("Inserting lab seat into database: {}", labSeat.getSeatID());
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setString(1, String.valueOf(labSeat.getSeatID()));
+    // INITIALIZES LAB SEAT TABLE IN DATABASE
+    public boolean initializeTable() {
+        String sql = "CREATE TABLE IF NOT EXISTS `LabSeat` ("
+                + "seatID INT PRIMARY KEY NOT NULL AUTO_INCREMENT, "
+                + "seatCode VARCHAR(20) NOT NULL, "
+                + "labID VARCHAR(20) NOT NULL, "
+                + "FOREIGN KEY (labID) REFERENCES `Lab`(labID)"
+                + ");";
+
+        try (PreparedStatement dbStmt = conn.prepareStatement(sql)) {
+            dbStmt.execute();
+            return true;
+        } catch (SQLException sqle) {
+            logger.error("Failed to initialize LabSeat table", sqle);
+        } catch (Exception e) {
+            logger.error("Unexpected error while initializing LabSeat table", e);
+        }
+        return false;
+    }
+
+    // CREATE LAB SEAT RECORD IN DB
+    public boolean saveLabSeat(LabSeat labSeat) {
+        String sql = "INSERT INTO `LabSeat` "
+                + "(seatCode, labID) "
+                + "VALUES (?, ?)";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setString(1, labSeat.getSeatCode());
             pstmt.setString(2, labSeat.getSeatLocation().getLabID());
-            pstmt.setString(3, seatCode);
-            
-            int rowsAffected = pstmt.executeUpdate();
-            logger.info("Lab seat inserted successfully: {}", labSeat.getSeatID());
-            return rowsAffected > 0;
-            
-        } catch (SQLException e) {
-            logger.error("SQLException while inserting lab seat: {}", labSeat.getSeatID(), e);
-            return false;
-        } catch (Exception e) {
-            logger.error("Unexpected exception while inserting lab seat: {}", labSeat.getSeatID(), e);
-            return false;
-        }
-    }
-    
 
-    public LabSeat getLabSeatById(String seatID) {
-        String query = "SELECT * FROM labSeats WHERE seatID = ?";
-        
-        try {
-            logger.debug("Fetching lab seat from database with ID: {}", seatID);
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setString(1, seatID);
-            
-            ResultSet rs = pstmt.executeQuery();
-            
-            if (rs.next()) {
-                logger.debug("Lab seat found in database: {}", seatID);
-                return mapResultSetToLabSeat(rs);
-            } else {
-                logger.warn("Lab seat not found in database: {}", seatID);
-                return null;
+            int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected > 0) {
+                try (ResultSet rs = pstmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        int generatedID = rs.getInt(1);
+                        labSeat.setSeatID(generatedID);
+                    }
+                }
+                logger.info("Lab seat saved successfully: {}", labSeat.getSeatCode());
+                return true;
             }
-            
+
         } catch (SQLException e) {
-            logger.error("SQLException while fetching lab seat: {}", seatID, e);
-            return null;
+            logger.error("SQLException while inserting lab seat", e);
         } catch (Exception e) {
-            logger.error("Unexpected exception while fetching lab seat: {}", seatID, e);
-            return null;
+            logger.error("Unexpected exception while inserting lab seat", e);
         }
+        return false;
     }
-    
-   
+
+    public LabSeat getLabSeatById(int seatID) {
+        String query = "SELECT * FROM `LabSeat` WHERE seatID = ?";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setInt(1, seatID);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    logger.info("Retrieved lab seat by ID: {}", seatID);
+                    return mapResultSetToLabSeat(rs);
+                }
+            }
+
+            logger.warn("Lab seat not found for ID: {}", seatID);
+        } catch (SQLException e) {
+            logger.error("SQLException while fetching lab seat", e);
+        } catch (Exception e) {
+            logger.error("Unexpected exception while fetching lab seat", e);
+        }
+        return null;
+    }
+
     public List<LabSeat> getLabSeatsByLabId(String labID) {
-        String query = "SELECT * FROM labSeats WHERE labID = ? ORDER BY seatID ASC";
+        String query = "SELECT * FROM `LabSeat` WHERE labID = ? ORDER BY seatID";
         List<LabSeat> seats = new ArrayList<>();
-        
-        try {
-            logger.debug("Fetching all lab seats for lab: {}", labID);
-            PreparedStatement pstmt = conn.prepareStatement(query);
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setString(1, labID);
-            
-            ResultSet rs = pstmt.executeQuery();
-            
-            while (rs.next()) {
-                LabSeat seat = mapResultSetToLabSeat(rs);
-                seats.add(seat);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    seats.add(mapResultSetToLabSeat(rs));
+                }
             }
-            
+
             logger.info("Retrieved {} lab seats for lab: {}", seats.size(), labID);
-            return seats;
-            
         } catch (SQLException e) {
-            logger.error("SQLException while fetching lab seats for lab: {}", labID, e);
-            return seats;
+            logger.error("SQLException while fetching lab seats by labID: {}", labID, e);
         } catch (Exception e) {
-            logger.error("Unexpected exception while fetching lab seats for lab: {}", labID, e);
-            return seats;
+            logger.error("Unexpected exception while fetching lab seats by labID: {}", labID, e);
         }
+
+        return seats;
     }
-    
+
+    public List<LabSeat> getLabSeatsBySeatCode(String seatCode) {
+        String query = "SELECT * FROM `LabSeat` WHERE seatCode = ? ORDER BY seatID";
+        List<LabSeat> seats = new ArrayList<>();
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setString(1, seatCode);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    seats.add(mapResultSetToLabSeat(rs));
+                }
+            }
+
+            logger.info("Retrieved {} lab seats with seatCode: {}", seats.size(), seatCode);
+        } catch (SQLException e) {
+            logger.error("SQLException while fetching lab seats by seatCode: {}", seatCode, e);
+        } catch (Exception e) {
+            logger.error("Unexpected exception while fetching lab seats by seatCode: {}", seatCode, e);
+        }
+
+        return seats;
+    }
 
     public List<LabSeat> getAllLabSeats() {
-        String query = "SELECT * FROM labSeats";
+        String query = "SELECT * FROM `LabSeat` ORDER BY seatID";
         List<LabSeat> seats = new ArrayList<>();
-        
-        try {
-            logger.debug("Fetching all lab seats from database");
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery(query);
-            
+
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
             while (rs.next()) {
-                LabSeat seat = mapResultSetToLabSeat(rs);
-                seats.add(seat);
+                seats.add(mapResultSetToLabSeat(rs));
             }
-            
+
             logger.info("Retrieved {} lab seats from database", seats.size());
-            return seats;
-            
         } catch (SQLException e) {
             logger.error("SQLException while fetching all lab seats", e);
-            return seats;
         } catch (Exception e) {
             logger.error("Unexpected exception while fetching all lab seats", e);
-            return seats;
         }
-    }
-    
 
-    public boolean updateLabSeat(LabSeat labSeat, String seatCode) {
-        String query = "UPDATE labSeats SET labID = ?, seatCode = ? WHERE seatID = ?";
-        
-        try {
-            logger.debug("Updating lab seat in database: {}", labSeat.getSeatID());
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setString(1, labSeat.getSeatLocation().getLabID());
-            pstmt.setString(2, seatCode);
-            pstmt.setString(3, String.valueOf(labSeat.getSeatID()));
-            
-            int rowsAffected = pstmt.executeUpdate();
-            logger.info("Lab seat updated successfully: {}", labSeat.getSeatID());
-            return rowsAffected > 0;
-            
-        } catch (SQLException e) {
-            logger.error("SQLException while updating lab seat: {}", labSeat.getSeatID(), e);
-            return false;
-        } catch (Exception e) {
-            logger.error("Unexpected exception while updating lab seat: {}", labSeat.getSeatID(), e);
-            return false;
-        }
+        return seats;
     }
-    
-    /**
-     * Deletes a lab seat from the database.
-     * 
-     * @param seatID the seat ID of the lab seat to delete
-     * @return true if deletion was successful, false otherwise
-     */
-    public boolean deleteLabSeat(String seatID) {
-        String query = "DELETE FROM labSeats WHERE seatID = ?";
-        
-        try {
-            logger.debug("Deleting lab seat from database: {}", seatID);
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setString(1, seatID);
-            
+
+    public boolean updateLabSeat(LabSeat updatedLabSeat) {
+        String query = "UPDATE `LabSeat` SET "
+                + "seatCode = ?, "
+                + "labID = ? "
+                + "WHERE seatID = ?";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setString(1, updatedLabSeat.getSeatCode());
+            pstmt.setString(2, updatedLabSeat.getSeatLocation().getLabID());
+            pstmt.setInt(3, updatedLabSeat.getSeatID());
+
             int rowsAffected = pstmt.executeUpdate();
-            logger.info("Lab seat deleted successfully: {}", seatID);
+            if (rowsAffected > 0) {
+                logger.info("Lab seat updated successfully: {}", updatedLabSeat.getSeatID());
+            } else {
+                logger.warn("No lab seat updated for ID: {}", updatedLabSeat.getSeatID());
+            }
             return rowsAffected > 0;
-            
+
         } catch (SQLException e) {
-            logger.error("SQLException while deleting lab seat: {}", seatID, e);
-            return false;
+            logger.error("SQLException while updating lab seat", e);
         } catch (Exception e) {
-            logger.error("Unexpected exception while deleting lab seat: {}", seatID, e);
-            return false;
+            logger.error("Unexpected exception while updating lab seat", e);
         }
+        return false;
     }
-    
-    /**
-     * Maps a ResultSet row to a LabSeat object.
-     * 
-     * @param rs the ResultSet containing lab seat data
-     * @return a LabSeat object
-     * @throws SQLException if database access error occurs
-     */
+
+    public boolean deleteLabSeat(int seatID) {
+        String query = "DELETE FROM `LabSeat` WHERE seatID = ?";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setInt(1, seatID);
+
+            int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected > 0) {
+                logger.info("Lab seat deleted successfully: {}", seatID);
+            } else {
+                logger.warn("No lab seat deleted for ID: {}", seatID);
+            }
+            return rowsAffected > 0;
+
+        } catch (SQLException e) {
+            logger.error("SQLException while deleting lab seat", e);
+        } catch (Exception e) {
+            logger.error("Unexpected exception while deleting lab seat", e);
+        }
+        return false;
+    }
+
     private LabSeat mapResultSetToLabSeat(ResultSet rs) throws SQLException {
         logger.debug("Mapping ResultSet to LabSeat object");
-        
+
         int seatID = rs.getInt("seatID");
+        String seatCode = rs.getString("seatCode");
         String labID = rs.getString("labID");
-        
-        // For a full implementation, you would retrieve the Lab details from database
-        // For now, creating a basic Lab with only labID
+
         Lab lab = new Lab();
         lab.setLabID(labID);
-        
-        return new LabSeat(seatID, lab);
+
+        LabSeat labSeat = new LabSeat();
+        labSeat.setSeatID(seatID);
+        labSeat.setSeatCode(seatCode);
+        labSeat.setSeatLocation(lab);
+
+        return labSeat;
     }
 }

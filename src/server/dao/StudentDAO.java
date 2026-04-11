@@ -2,6 +2,8 @@ package server.dao;
 import server.dto.StudentDTO;
 import server.model.Student;
 import server.model.User;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -12,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class StudentDAO {
+    private static final Logger logger = LogManager.getLogger(StudentDAO.class);
     private Connection conn;
     private UserDAO userDAO;
 
@@ -22,7 +25,6 @@ public class StudentDAO {
 
     //INITIALIZES STUDENT TABLE
     public boolean initializeTable(){
-        userDAO.initializeTable();//initializes user table first
 
         String sql = "CREATE TABLE IF NOT EXISTS Student (" +
                 "userID INT PRIMARY KEY NOT NULL, " +
@@ -37,9 +39,9 @@ public class StudentDAO {
             return true;
 
         }catch(SQLException sqle){
-            System.err.println("Failed to initialize table: "+ sqle.getMessage());
+            logger.error("Failed to initialize Student table", sqle);
         }catch(Exception e){
-            e.printStackTrace();
+            logger.error("Unexpected error while initializing Student table", e);
         }
 
         return false;
@@ -48,27 +50,27 @@ public class StudentDAO {
     //---------------------------CREATE OPERATION------------------------------------
     public boolean saveStudent(Student student){
 
-        initializeTable();//Ensures all necessary tables are initialized
+        String sql = "INSERT INTO Student (userID, studentID, faculty, school) VALUES (?, ?, ?, ?)";
 
-        if(userDAO.saveUser(student)) {//Saves user before saving student
-            String sql = "INSERT INTO Student (userID, studentID, faculty, school) VALUES (?, ?, ?, ?)";
-
-            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setInt(1, student.getUserID());
-                pstmt.setString(2, student.getStudentID());
-                pstmt.setString(3, student.getFaculty());
-                pstmt.setString(4, student.getSchool());
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, student.getUserID());
+            pstmt.setString(2, student.getStudentID());
+            pstmt.setString(3, student.getFaculty());
+            pstmt.setString(4, student.getSchool());
 
 
-                int rowsInserted = pstmt.executeUpdate();
-                return rowsInserted > 0;
-
-            } catch (SQLException sqle) {
-                System.err.println("Failed to save student: " + sqle.getMessage());
-            } catch (Exception e) {
-                e.printStackTrace();
+            int rowsInserted = pstmt.executeUpdate();
+            if (rowsInserted > 0) {
+                logger.info("Student saved successfully: {}", student.getStudentID());
             }
+            return rowsInserted > 0;
+
+        } catch (SQLException sqle) {
+            logger.error("Failed to save student: {}", student.getStudentID(), sqle);
+        } catch (Exception e) {
+            logger.error("Unexpected error while saving student", e);
         }
+
 
         return false;
     }
@@ -100,13 +102,14 @@ public class StudentDAO {
                 String faculty = rs.getString("faculty");
                 String school = rs.getString("school");
 
+                logger.info("Retrieved student by ID: {}", inputtedStudentID);
                 return new Student(userID, firstName, lastName, email, passwordHash,
                         userRole, active, lastUpdated, studentID, faculty, school);
             }
         }catch(SQLException sqle){
-            System.err.println("Failed to get Student: " + sqle.getMessage());
+            logger.error("Failed to retrieve student by ID: {}", inputtedStudentID, sqle);
         }catch(Exception e){
-            e.printStackTrace();
+            logger.error("Unexpected error while retrieving student by ID", e);
         }
         return null;
     }
@@ -137,13 +140,14 @@ public class StudentDAO {
                 String faculty = rs.getString("faculty");
                 String school = rs.getString("school");
 
+                logger.info("Retrieved student by email: {}", inputtedEmail);
                 return new Student(userID, firstName, lastName, email, passwordHash,
                         userRole, active, lastUpdated, studentID, faculty, school);
             }
         }catch(SQLException sqle){
-            System.err.println("Failed to get Student: " + sqle.getMessage());
+            logger.error("Failed to retrieve student by email: {}", inputtedEmail, sqle);
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Unexpected error while retrieving student by email", e);
         }
         return null;
     }
@@ -177,12 +181,13 @@ public class StudentDAO {
                 students.add(s);
             }
 
+            logger.info("Retrieved all students, count: {}", students.size());
             return students;
 
         }catch(SQLException sqle){
-            System.err.println("Failed to get All Students: " + sqle.getMessage());
+            logger.error("Failed to retrieve all students", sqle);
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Unexpected error while retrieving all students", e);
         }
 
         return students;
@@ -208,12 +213,16 @@ public class StudentDAO {
             int rowsUpdated = pstmt.executeUpdate();
             boolean studentUpdated = rowsUpdated > 0;
 
+            if (studentUpdated || userUpdated) {
+                logger.info("Student updated successfully: {}", student.getStudentID());
+            }
+
             return studentUpdated || userUpdated; //IF SOMETHING IS UPDATED THEN RETURN TRUE
 
         }catch(SQLException sqle){
-            System.err.println("Failed to update Student: " + sqle.getMessage());
+            logger.error("Failed to update Student: {}", student.getStudentID(), sqle);
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Unexpected error while updating student", e);
         }
 
         return false;
@@ -229,12 +238,15 @@ public class StudentDAO {
             pstmt.setString(1, studentID);
 
             int rowsDeleted = pstmt.executeUpdate();
+            if (rowsDeleted > 0) {
+                logger.info("Student deleted successfully: {}", studentID);
+            }
             return rowsDeleted > 0;
 
         }catch(SQLException sqle){
-            System.err.println("Failed to delete Student: " + sqle.getMessage());
+            logger.error("Failed to delete Student: {}", studentID, sqle);
         }catch (Exception e){
-            e.printStackTrace();
+            logger.error("Unexpected error while deleting student", e);
         }
 
         return false;
@@ -246,11 +258,12 @@ public class StudentDAO {
 
         try(PreparedStatement pstmt = conn.prepareStatement(sql)){
             int rowsDeleted = pstmt.executeUpdate();
+            logger.info("Deleted all students, count: {}", rowsDeleted);
 
             return rowsDeleted > 0;
 
         }catch(SQLException sqle){
-            System.err.println("Failed to delete All Students: " + sqle.getMessage());
+            logger.error("Failed to delete All Students", sqle);
         }
 
         return false;

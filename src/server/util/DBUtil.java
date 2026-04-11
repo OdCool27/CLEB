@@ -44,6 +44,11 @@ public class DBUtil {
                 logger.info("Successfully connected to database");
                 JOptionPane.showMessageDialog(null, "Connected to database successfully!", "DB Status",  JOptionPane.INFORMATION_MESSAGE);
 
+                //Initializes all tables after the database is connected.
+                if(!DatabaseInitializer.initializeAllTables(dbConn)){
+                    System.exit(0);//Stops the server
+                }
+
                 return dbConn;
 
             }catch(SQLException sqle){
@@ -56,4 +61,7 @@ public class DBUtil {
         }
         return dbConn;
     }
+
+
+
 }

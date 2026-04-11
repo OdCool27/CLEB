@@ -1,11 +1,12 @@
 package server.dao;
 
-import server.model.LabSeatReservation;
 import server.model.LabSeat;
-import server.model.Lab;
+import server.model.LabSeatReservation;
 import server.model.Reservation;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -16,283 +17,327 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-
 public class LabSeatReservationDAO {
     private static final Logger logger = LogManager.getLogger(LabSeatReservationDAO.class);
-    private Connection conn;
+    private final Connection conn;
 
     public LabSeatReservationDAO(Connection conn) {
         this.conn = conn;
-        logger.debug("LabSeatReservationDAO initialized with connection");
     }
-    
 
-    public boolean insertLabSeatReservation(int studentUserID, String seatID, LocalDateTime reservationDateTime,
-                                           int durationInHours, String approvalStatus, Integer approvedByEmployeeID) {
-        String query = "INSERT INTO labSeatReservations (studentUserID, seatID, reservationDateTime, durationInHours, " +
-                       "approvalStatus, approvedByEmployeeID, lastUpdated) VALUES (?, ?, ?, ?, ?, ?, ?)";
-        
-        try {
-            logger.debug("Inserting lab seat reservation into database: student {}, seat {}, datetime {}", 
-                        studentUserID, seatID, reservationDateTime);
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, studentUserID);
-            pstmt.setString(2, seatID);
-            pstmt.setTimestamp(3, Timestamp.valueOf(reservationDateTime));
-            pstmt.setInt(4, durationInHours);
-            pstmt.setString(5, approvalStatus);
-            if (approvedByEmployeeID != null) {
-                pstmt.setInt(6, approvedByEmployeeID);
+    // INITIALIZES LAB SEAT RESERVATION TABLE IN DATABASE
+    public boolean initializeTable() {
+        String sql = "CREATE TABLE IF NOT EXISTS `LabSeatReservation` ("
+                + "reservationID INT PRIMARY KEY NOT NULL AUTO_INCREMENT, "
+                + "studentID VARCHAR(20) NOT NULL, "
+                + "dateTime DATETIME NOT NULL, "
+                + "durationInHours INT NOT NULL, "
+                + "approvalStatus VARCHAR(20) NOT NULL, "
+                + "approvedBy VARCHAR(50), "
+                + "lastUpdated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                + "seatID INT NOT NULL, "
+                + "FOREIGN KEY (seatID) REFERENCES `LabSeat`(seatID)"
+                + ");";
+
+        try (PreparedStatement dbStmt = conn.prepareStatement(sql)) {
+            dbStmt.execute();
+            return true;
+        } catch (SQLException sqle) {
+            logger.error("Failed to initialize LabSeatReservation table", sqle);
+        } catch (Exception e) {
+            logger.error("Unexpected error while initializing LabSeatReservation table", e);
+        }
+        return false;
+    }
+
+    // CREATE LAB SEAT RESERVATION RECORD IN DB
+    public boolean saveLabSeatReservation(LabSeatReservation seatRes) {
+        String sql = "INSERT INTO `LabSeatReservation` "
+                + "(studentID, dateTime, durationInHours, approvalStatus, approvedBy, lastUpdated, seatID) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            pstmt.setString(1, seatRes.getStudentID());
+            pstmt.setTimestamp(2, Timestamp.valueOf(seatRes.getDateTime()));
+            pstmt.setInt(3, seatRes.getDurationInHours());
+            pstmt.setString(4, seatRes.getApprovalStatus().name());
+            pstmt.setString(5, seatRes.getApprovedBy());
+
+            if (seatRes.getLastUpdated() != null) {
+                pstmt.setTimestamp(6, Timestamp.valueOf(seatRes.getLastUpdated()));
             } else {
-                pstmt.setNull(6, java.sql.Types.INTEGER);
+                pstmt.setTimestamp(6, Timestamp.valueOf(LocalDateTime.now()));
             }
-            pstmt.setTimestamp(7, Timestamp.valueOf(LocalDateTime.now()));
-            
+
+            pstmt.setInt(7, seatRes.getReservedSeat().getSeatID());
+
             int rowsAffected = pstmt.executeUpdate();
-            logger.info("Lab seat reservation inserted successfully");
-            return rowsAffected > 0;
-            
+            if (rowsAffected > 0) {
+                try (ResultSet rs = pstmt.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        int generatedID = rs.getInt(1);
+                        seatRes.setReservationID(generatedID);
+                    }
+                }
+                logger.info("Lab seat reservation saved successfully for student: {}", seatRes.getStudentID());
+                return true;
+            }
+
         } catch (SQLException e) {
             logger.error("SQLException while inserting lab seat reservation", e);
-            return false;
         } catch (Exception e) {
             logger.error("Unexpected exception while inserting lab seat reservation", e);
-            return false;
         }
+        return false;
     }
-    
 
-    public LabSeatReservation getLabSeatReservationByCompositeKey(int studentUserID, String seatID, LocalDateTime reservationDateTime) {
-        String query = "SELECT * FROM labSeatReservations WHERE studentUserID = ? AND seatID = ? AND reservationDateTime = ?";
-        
-        try {
-            logger.debug("Fetching lab seat reservation by composite key");
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, studentUserID);
-            pstmt.setString(2, seatID);
-            pstmt.setTimestamp(3, Timestamp.valueOf(reservationDateTime));
-            
-            ResultSet rs = pstmt.executeQuery();
-            
-            if (rs.next()) {
-                logger.debug("Lab seat reservation found in database");
-                return mapResultSetToLabSeatReservation(rs);
-            } else {
-                logger.warn("Lab seat reservation not found in database");
-                return null;
+    public LabSeatReservation getLabSeatReservationById(int reservationID) {
+        String query = "SELECT * FROM `LabSeatReservation` WHERE reservationID = ?";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setInt(1, reservationID);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    logger.info("Retrieved lab seat reservation by ID: {}", reservationID);
+                    return mapResultSetToLabSeatReservation(rs);
+                }
             }
-            
+
+            logger.warn("Lab seat reservation not found for ID: {}", reservationID);
         } catch (SQLException e) {
             logger.error("SQLException while fetching lab seat reservation", e);
-            return null;
         } catch (Exception e) {
             logger.error("Unexpected exception while fetching lab seat reservation", e);
-            return null;
         }
+        return null;
     }
-    
-    
-    public List<LabSeatReservation> getReservationsByStudentId(int studentUserID) {
-        String query = "SELECT * FROM labSeatReservations WHERE studentUserID = ? ORDER BY reservationDateTime DESC";
+
+    public List<LabSeatReservation> getReservationsByStudentId(String studentID) {
+        String query = "SELECT * FROM `LabSeatReservation` WHERE studentID = ? ORDER BY dateTime DESC";
         List<LabSeatReservation> reservations = new ArrayList<>();
-        
-        try {
-            logger.debug("Fetching lab seat reservations for student: {}", studentUserID);
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, studentUserID);
-            
-            ResultSet rs = pstmt.executeQuery();
-            
-            while (rs.next()) {
-                LabSeatReservation reservation = mapResultSetToLabSeatReservation(rs);
-                reservations.add(reservation);
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setString(1, studentID);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    reservations.add(mapResultSetToLabSeatReservation(rs));
+                }
             }
-            
-            logger.info("Retrieved {} lab seat reservations for student: {}", reservations.size(), studentUserID);
-            return reservations;
-            
+
+            logger.info("Retrieved {} lab seat reservations for student: {}", reservations.size(), studentID);
         } catch (SQLException e) {
-            logger.error("SQLException while fetching lab seat reservations for student: {}", studentUserID, e);
-            return reservations;
+            logger.error("SQLException while fetching lab seat reservations for student: {}", studentID, e);
         } catch (Exception e) {
-            logger.error("Unexpected exception while fetching lab seat reservations for student: {}", studentUserID, e);
-            return reservations;
+            logger.error("Unexpected exception while fetching lab seat reservations for student: {}", studentID, e);
         }
+
+        return reservations;
     }
-    
 
     public List<LabSeatReservation> getReservationsByStatus(String status) {
-        String query = "SELECT * FROM labSeatReservations WHERE approvalStatus = ? ORDER BY reservationDateTime DESC";
+        String query = "SELECT * FROM `LabSeatReservation` WHERE approvalStatus = ? ORDER BY dateTime DESC";
         List<LabSeatReservation> reservations = new ArrayList<>();
-        
-        try {
-            logger.debug("Fetching lab seat reservations with status: {}", status);
-            PreparedStatement pstmt = conn.prepareStatement(query);
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setString(1, status);
-            
-            ResultSet rs = pstmt.executeQuery();
-            
-            while (rs.next()) {
-                LabSeatReservation reservation = mapResultSetToLabSeatReservation(rs);
-                reservations.add(reservation);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    reservations.add(mapResultSetToLabSeatReservation(rs));
+                }
             }
-            
+
             logger.info("Retrieved {} lab seat reservations with status: {}", reservations.size(), status);
-            return reservations;
-            
         } catch (SQLException e) {
             logger.error("SQLException while fetching lab seat reservations by status: {}", status, e);
-            return reservations;
         } catch (Exception e) {
             logger.error("Unexpected exception while fetching lab seat reservations by status: {}", status, e);
-            return reservations;
         }
+
+        return reservations;
     }
-    
-    /**
-     * Retrieves all lab seat reservations approved by a specific employee from the database.
-     * 
-     */
-    public List<LabSeatReservation> getReservationsByApprovedBy(int approvedByEmployeeID) {
-        String query = "SELECT * FROM labSeatReservations WHERE approvedByEmployeeID = ? ORDER BY reservationDateTime DESC";
+
+    public List<LabSeatReservation> getReservationsByApprovedBy(String approvedBy) {
+        String query = "SELECT * FROM `LabSeatReservation` WHERE approvedBy = ? ORDER BY dateTime DESC";
         List<LabSeatReservation> reservations = new ArrayList<>();
-        
-        try {
-            logger.debug("Fetching lab seat reservations approved by employee: {}", approvedByEmployeeID);
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, approvedByEmployeeID);
-            
-            ResultSet rs = pstmt.executeQuery();
-            
-            while (rs.next()) {
-                LabSeatReservation reservation = mapResultSetToLabSeatReservation(rs);
-                reservations.add(reservation);
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setString(1, approvedBy);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    reservations.add(mapResultSetToLabSeatReservation(rs));
+                }
             }
-            
-            logger.info("Retrieved {} lab seat reservations approved by employee: {}", reservations.size(), approvedByEmployeeID);
-            return reservations;
-            
+
+            logger.info("Retrieved {} lab seat reservations approved by: {}", reservations.size(), approvedBy);
         } catch (SQLException e) {
-            logger.error("SQLException while fetching lab seat reservations by approved employee: {}", approvedByEmployeeID, e);
-            return reservations;
+            logger.error("SQLException while fetching lab seat reservations by approver: {}", approvedBy, e);
         } catch (Exception e) {
-            logger.error("Unexpected exception while fetching lab seat reservations by approved employee: {}", approvedByEmployeeID, e);
-            return reservations;
+            logger.error("Unexpected exception while fetching lab seat reservations by approver: {}", approvedBy, e);
         }
+
+        return reservations;
     }
-    
-    /**
-     * Retrieves all lab seat reservations from the database.
-     * 
-     * @return a list of all LabSeatReservation objects, empty list if none found
-     */
-    public List<LabSeatReservation> getAllLabSeatReservations() {
-        String query = "SELECT * FROM labSeatReservations ORDER BY reservationDateTime DESC";
+
+    public List<LabSeatReservation> getReservationsBySeatId(int seatID) {
+        String query = "SELECT * FROM `LabSeatReservation` WHERE seatID = ? ORDER BY dateTime DESC";
         List<LabSeatReservation> reservations = new ArrayList<>();
-        
-        try {
-            logger.debug("Fetching all lab seat reservations from database");
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery(query);
-            
-            while (rs.next()) {
-                LabSeatReservation reservation = mapResultSetToLabSeatReservation(rs);
-                reservations.add(reservation);
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setInt(1, seatID);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    reservations.add(mapResultSetToLabSeatReservation(rs));
+                }
             }
-            
+
+            logger.info("Retrieved {} lab seat reservations for seat: {}", reservations.size(), seatID);
+        } catch (SQLException e) {
+            logger.error("SQLException while fetching lab seat reservations for seat: {}", seatID, e);
+        } catch (Exception e) {
+            logger.error("Unexpected exception while fetching lab seat reservations for seat: {}", seatID, e);
+        }
+
+        return reservations;
+    }
+
+    public List<LabSeatReservation> getReservationsBySeatIdAndDate(int seatID, LocalDateTime date) {
+        String query = "SELECT * FROM `LabSeatReservation` WHERE seatID = ? AND DATE(dateTime) = DATE(?) AND HOUR(dateTime) < 21 ORDER BY dateTime ASC";
+        List<LabSeatReservation> reservations = new ArrayList<>();
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setInt(1, seatID);
+            pstmt.setTimestamp(2, Timestamp.valueOf(date));
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    reservations.add(mapResultSetToLabSeatReservation(rs));
+                }
+            }
+
+            logger.info("Retrieved {} lab seat reservations for seat: {} on date: {}", reservations.size(), seatID, date.toLocalDate());
+        } catch (SQLException e) {
+            logger.error("SQLException while fetching lab seat reservations for seat: {} on date: {}", seatID, date.toLocalDate(), e);
+        } catch (Exception e) {
+            logger.error("Unexpected exception while fetching lab seat reservations for seat: {} on date: {}", seatID, date.toLocalDate(), e);
+        }
+
+        return reservations;
+    }
+
+    public List<LabSeatReservation> getAllLabSeatReservations() {
+        String query = "SELECT * FROM `LabSeatReservation` ORDER BY dateTime DESC";
+        List<LabSeatReservation> reservations = new ArrayList<>();
+
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
+            while (rs.next()) {
+                reservations.add(mapResultSetToLabSeatReservation(rs));
+            }
+
             logger.info("Retrieved {} lab seat reservations from database", reservations.size());
-            return reservations;
-            
         } catch (SQLException e) {
             logger.error("SQLException while fetching all lab seat reservations", e);
-            return reservations;
         } catch (Exception e) {
             logger.error("Unexpected exception while fetching all lab seat reservations", e);
-            return reservations;
         }
-    }
-    
 
-    public boolean updateLabSeatReservation(int studentUserID, String seatID, LocalDateTime reservationDateTime,
-                                           int durationInHours, String approvalStatus, Integer approvedByEmployeeID) {
-        String query = "UPDATE labSeatReservations SET durationInHours = ?, approvalStatus = ?, " +
-                       "approvedByEmployeeID = ?, lastUpdated = ? WHERE studentUserID = ? AND seatID = ? AND reservationDateTime = ?";
-        
-        try {
-            logger.debug("Updating lab seat reservation in database");
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, durationInHours);
-            pstmt.setString(2, approvalStatus);
-            if (approvedByEmployeeID != null) {
-                pstmt.setInt(3, approvedByEmployeeID);
-            } else {
-                pstmt.setNull(3, java.sql.Types.INTEGER);
-            }
-            pstmt.setTimestamp(4, Timestamp.valueOf(LocalDateTime.now()));
-            pstmt.setInt(5, studentUserID);
-            pstmt.setString(6, seatID);
-            pstmt.setTimestamp(7, Timestamp.valueOf(reservationDateTime));
-            
+        return reservations;
+    }
+
+    public boolean updateLabSeatReservation(LabSeatReservation updatedReservation) {
+        String query = "UPDATE `LabSeatReservation` SET "
+                + "studentID = ?, "
+                + "dateTime = ?, "
+                + "durationInHours = ?, "
+                + "approvalStatus = ?, "
+                + "approvedBy = ?, "
+                + "lastUpdated = ?, "
+                + "seatID = ? "
+                + "WHERE reservationID = ?";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setString(1, updatedReservation.getStudentID());
+            pstmt.setTimestamp(2, Timestamp.valueOf(updatedReservation.getDateTime()));
+            pstmt.setInt(3, updatedReservation.getDurationInHours());
+            pstmt.setString(4, updatedReservation.getApprovalStatus().name());
+            pstmt.setString(5, updatedReservation.getApprovedBy());
+            pstmt.setTimestamp(6, Timestamp.valueOf(LocalDateTime.now()));
+            pstmt.setInt(7, updatedReservation.getReservedSeat().getSeatID());
+            pstmt.setInt(8, updatedReservation.getReservationID());
+
             int rowsAffected = pstmt.executeUpdate();
-            logger.info("Lab seat reservation updated successfully");
+            if (rowsAffected > 0) {
+                logger.info("Lab seat reservation updated successfully for ID: {}", updatedReservation.getReservationID());
+            } else {
+                logger.warn("No lab seat reservation updated for ID: {}", updatedReservation.getReservationID());
+            }
             return rowsAffected > 0;
-            
+
         } catch (SQLException e) {
             logger.error("SQLException while updating lab seat reservation", e);
-            return false;
         } catch (Exception e) {
             logger.error("Unexpected exception while updating lab seat reservation", e);
-            return false;
         }
+        return false;
     }
-    
-  
-    public boolean deleteLabSeatReservation(int studentUserID, String seatID, LocalDateTime reservationDateTime) {
-        String query = "DELETE FROM labSeatReservations WHERE studentUserID = ? AND seatID = ? AND reservationDateTime = ?";
-        
-        try {
-            logger.debug("Deleting lab seat reservation from database");
-            PreparedStatement pstmt = conn.prepareStatement(query);
-            pstmt.setInt(1, studentUserID);
-            pstmt.setString(2, seatID);
-            pstmt.setTimestamp(3, Timestamp.valueOf(reservationDateTime));
-            
+
+    public boolean deleteLabSeatReservation(int reservationID) {
+        String query = "DELETE FROM `LabSeatReservation` WHERE reservationID = ?";
+
+        try (PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setInt(1, reservationID);
+
             int rowsAffected = pstmt.executeUpdate();
-            logger.info("Lab seat reservation deleted successfully");
+            if (rowsAffected > 0) {
+                logger.info("Lab seat reservation deleted successfully for ID: {}", reservationID);
+            } else {
+                logger.warn("No lab seat reservation deleted for ID: {}", reservationID);
+            }
             return rowsAffected > 0;
-            
+
         } catch (SQLException e) {
             logger.error("SQLException while deleting lab seat reservation", e);
-            return false;
         } catch (Exception e) {
             logger.error("Unexpected exception while deleting lab seat reservation", e);
-            return false;
         }
+        return false;
     }
-    
-  
+
     private LabSeatReservation mapResultSetToLabSeatReservation(ResultSet rs) throws SQLException {
         logger.debug("Mapping ResultSet to LabSeatReservation object");
-        
-        // Note: This maps to the Reservation composite key structure
-        // Map is adapted since LabSeatReservation extends Reservation
-        int studentUserID = rs.getInt("studentUserID");
-        String seatID = rs.getString("seatID");
-        LocalDateTime reservationDateTime = rs.getTimestamp("reservationDateTime").toLocalDateTime();
+
+        int reservationID = rs.getInt("reservationID");
+        String studentID = rs.getString("studentID");
+        LocalDateTime dateTime = rs.getTimestamp("dateTime").toLocalDateTime();
         int durationInHours = rs.getInt("durationInHours");
         String approvalStatus = rs.getString("approvalStatus");
-        Integer approvedByEmployeeID = rs.getObject("approvedByEmployeeID") != null ? rs.getInt("approvedByEmployeeID") : null;
-        
-        // Create a basic LabSeat with seatID
-        LabSeat labSeat = new LabSeat();
-        labSeat.setSeatID((int) Long.parseLong(seatID));
-        
-        // Use placeholder values for reservationID and studentID (from Student.userID)
-        int reservationID = studentUserID; // Placeholder
-        String studentID = String.valueOf(studentUserID); // Placeholder
-        String approvedByStr = approvedByEmployeeID != null ? String.valueOf(approvedByEmployeeID) : "";
-        
-        return new LabSeatReservation(reservationID, studentID, reservationDateTime, durationInHours, 
-                                     Reservation.ReservationStatus.valueOf(approvalStatus), approvedByStr, labSeat);
+        String approvedBy = rs.getString("approvedBy");
+        int seatID = rs.getInt("seatID");
+
+        LabSeat seat = new LabSeat();
+        seat.setSeatID(seatID);
+
+        LabSeatReservation reservation = new LabSeatReservation(
+                reservationID,
+                studentID,
+                dateTime,
+                durationInHours,
+                Reservation.ReservationStatus.valueOf(approvalStatus),
+                approvedBy,
+                seat
+        );
+
+        Timestamp lastUpdatedTs = rs.getTimestamp("lastUpdated");
+        if (lastUpdatedTs != null) {
+            reservation.setLastUpdated(lastUpdatedTs.toLocalDateTime());
+        }
+
+        return reservation;
     }
 }

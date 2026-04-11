@@ -9,6 +9,7 @@ public class Reservation {
     protected int durationInHours;
     protected ReservationStatus approvalStatus;
     protected String approvedBy;
+    protected LocalDateTime lastUpdated;
 
     public enum ReservationStatus {PENDING, APPROVED, REJECTED, CANCELLED}
     /*
@@ -35,6 +36,7 @@ public class Reservation {
         this.durationInHours = durationInHours;
         this.approvalStatus = approvalStatus;
         this.approvedBy = approvedBy;
+        this.lastUpdated = LocalDateTime.now();
     }
 
     public int getReservationID() {
@@ -85,6 +87,14 @@ public class Reservation {
         this.approvedBy = approvedBy;
     }
 
+    public LocalDateTime getLastUpdated() {
+        return lastUpdated;
+    }
+
+    public void setLastUpdated(LocalDateTime lastUpdated) {
+        this.lastUpdated = lastUpdated;
+    }
+
     @Override
     public String toString() {
         return  "Reservation ID: " + reservationID + "\n" +
@@ -92,6 +102,8 @@ public class Reservation {
                 "Date & Time: " + dateTime + "\n" +
                 "Duration (hrs): " + durationInHours + "\n" +
                 "Approval Status: " + approvalStatus.toString() + "\n" +
-                "Approved By: " + approvedBy + "\n";
+                "Approved By: " + approvedBy +
+                "Last Updated: " + lastUpdated.toString() +
+                "\n";
     }
 }

@@ -23,7 +23,7 @@ public class ClientHandler implements Runnable {
     public ClientHandler(Socket socket, Connection dbConn) {
         this.socket = socket;
         this.dbConn = dbConn;
-        this.dispatcher = new RequestDispatcher();
+        this.dispatcher = new RequestDispatcher(dbConn);
     }
 
     private void closeConnections(){

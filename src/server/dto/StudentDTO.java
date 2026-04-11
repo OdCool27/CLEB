@@ -17,4 +17,8 @@ public class StudentDTO extends UserDTO{
         this.faculty = faculty;
         this.school = school;
     }
+
+    public String getStudentID() { return studentID; }
+    public String getFaculty() { return faculty; }
+    public String getSchool() { return school; }
 }
