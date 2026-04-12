@@ -15,7 +15,6 @@ public class DBUtil {
     private final String PASSWORD = "usbw";
 
     public DBUtil(){
-        logger.info("Initializing DBUtil - connecting to database");
         this.dbConn = getDatabaseConnection();
     }
 
@@ -25,8 +24,10 @@ public class DBUtil {
 
     public void closeConnection() throws SQLException{
         try {
-            dbConn.close();
-            logger.info("Database connection closed successfully");
+            if (dbConn != null) {
+                dbConn.close();
+                logger.info("Database connection closed successfully");
+            }
         } catch (SQLException e) {
             logger.error("Error closing database connection", e);
             throw e;
@@ -48,15 +49,13 @@ public class DBUtil {
                 if(!DatabaseInitializer.initializeAllTables(dbConn)){
                     System.exit(0);//Stops the server
                 }
-
+                JOptionPane.showMessageDialog(null, "All database tables initialized successfully!", "DB Status",  JOptionPane.INFORMATION_MESSAGE);
                 return dbConn;
 
             }catch(SQLException sqle){
                 logger.error("SQLException while connecting to database at URL: {}", URL, sqle);
-                sqle.printStackTrace();
             }catch(Exception e){
                 logger.error("Unexpected exception while connecting to database", e);
-                e.printStackTrace();
             }
         }
         return dbConn;

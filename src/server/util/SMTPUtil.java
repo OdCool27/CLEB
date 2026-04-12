@@ -1,5 +1,7 @@
 package server.util;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import jakarta.mail.*;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
@@ -8,15 +10,16 @@ import java.io.IOException;
 import java.util.Properties;
 
 public class SMTPUtil {
+    private static final Logger logger = LogManager.getLogger(SMTPUtil.class);
     private static final Properties smtpProps = new Properties();
     private static final String propertiesFilePath = "src/server/smtp.properties";
 
     static {
         try (FileInputStream input = new FileInputStream(propertiesFilePath)) {
             smtpProps.load(input);
-            System.out.println("SMTP Configuration Loaded Successfully");
+            logger.info("SMTP Configuration Loaded Successfully");
         } catch (IOException e) {
-            System.err.println("Failed to load SMTP config file: " + e.getMessage());
+            logger.error("Failed to load SMTP config file: {}", propertiesFilePath, e);
         }
     }
 
@@ -44,10 +47,9 @@ public class SMTPUtil {
             message.setContent(content, "text/html; charset=utf-8");
 
             Transport.send(message);
-            System.out.println("Email Sent to " + to);
+            logger.info("Email Sent to {}", to);
         } catch (MessagingException e) {
-            System.err.println("Failed to send email to " + to + ": " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Failed to send email to {}", to, e);
         }
     }
 }

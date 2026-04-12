@@ -1,12 +1,12 @@
 package server.util;
-
-//import java.io.IOException;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 
 public class InputValidator {
-
+    private static final Logger logger = LogManager.getLogger(InputValidator.class);
     //Validation for Email
 	private static final String EmailRegex = "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,6}$";
 	private static final Pattern EmailPattern = Pattern.compile(EmailRegex, Pattern.CASE_INSENSITIVE);
@@ -16,31 +16,31 @@ public class InputValidator {
 		try {
 			//Check if email is null
 			if (email == null) {
-				System.err.println("Validation error: Email can't be null");
+				logger.warn("Validation error: Email can't be null");
 				return false;
 				}
 			
 			//Check if email is empty
 			if (email.trim().isEmpty()) {
-				System.err.println("Validation error: Email can't be empty");
+				logger.warn("Validation error: Email can't be empty");
 				return false;
 				}
 			
 			//Check length of email
 			 if (email.length() > 254) {
-				 System.err.println("Validation error: Email exceeds maximum length");
+				 logger.warn("Validation error: Email exceeds maximum length");
 	                return false;
 	                }
 	            
 	         //Check for consecutive dots
 			 if (email.contains("..")) {
-				 System.err.println("Validation error: Email cannot contain consecutive dots");
+				 logger.warn("Validation error: Email cannot contain consecutive dots");
 	                return false;
 	                }
 			 
 			 //Check if email starts or ends with dot
 			 if (email.startsWith(".") || email.endsWith(".")) {
-				 System.err.println("Validation error: Email cannot start or end with a dot");
+				 logger.warn("Validation error: Email cannot start or end with a dot");
 	                return false;
 	                }
 			 
@@ -50,11 +50,9 @@ public class InputValidator {
 		
 		//Error handling
 		}catch (IllegalArgumentException ie) {
-			System.err.println("Illegal input during validation: " + ie.getMessage());
-			ie.printStackTrace();
+			logger.error("Illegal input during validation", ie);
 		}catch (Exception e) {
-			System.err.println("Unexpected error during validation: " + e.getMessage());
-			e.printStackTrace();
+			logger.error("Unexpected error during validation", e);
 		}
 		return false;
 			
@@ -67,25 +65,25 @@ public class InputValidator {
 		try {
 			//Check if password is null 
 	        if (password == null) {
-	            System.err.println("Validation error: Password cannot be null");
+	            logger.warn("Validation error: Password cannot be null");
 	            return false;
 	        }
 
 	        //Check if password is empty
 	        if (password.isEmpty()) {
-	            System.err.println("Validation error: Password cannot be empty");
+	            logger.warn("Validation error: Password cannot be empty");
 	            return false;
 	        }
 	        
 	        //Check password minimum length
 	        if (password.length() < 8) {
-	            System.err.println("Validation error: Password is too short");
+	            logger.warn("Validation error: Password is too short");
 	            return false;
 	        }
 
 	        //Check password max length
 	        if (password.length() > 64) {
-	            System.err.println("Validation error: Password exceeds limit");
+	            logger.warn("Validation error: Password exceeds limit");
 	            return false;
 	        }
 	        
@@ -93,26 +91,20 @@ public class InputValidator {
 	        if(checkPassword(password)) {
 	        	
 	        	if (password.length() >= 8 && password.length() <= 64) {
-	                System.out.println("Password is strong!");
+	                logger.debug("Password strength validation passed");
 	            }
 					return true;
 				}
 				else 
 				{
-					System.err.println("Validation error: Password is weak. Must contain:\n" 
-							+ "- Uppercase letter\n"
-							+ "- Lowercase letter\n"
-							+ "- Number\n"
-							+ "- Special characters (! @ # $ ^ * & %)");
+					logger.warn("Validation error: Password is weak. Must contain: Uppercase, Lowercase, Number, and Special characters.");
 					return false;
 				}
 	        
 			}catch (NullPointerException npe) {
-				System.err.println("Password can't be null: " + npe.getMessage());
-				npe.printStackTrace();
+				logger.error("Password can't be null", npe);
 			}catch (Exception e) {
-				System.err.println("Unexpected error during validation: " + e.getMessage());
-				e.printStackTrace();
+				logger.error("Unexpected error during validation", e);
 				return false;
 				}
 		
@@ -162,8 +154,7 @@ public class InputValidator {
 		
 		
 	}catch (Exception e) {
-		System.err.println("Error while checking password: " + e.getMessage());
-		e.printStackTrace();
+		logger.error("Error while checking password", e);
         return false;
         }
 		return false;

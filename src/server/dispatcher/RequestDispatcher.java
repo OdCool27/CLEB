@@ -1,5 +1,7 @@
 package server.dispatcher;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import server.envelopes.RequestEnvelope;
 import server.envelopes.ResponseEnvelope;
 import server.handlers.EquipmentHandler;
@@ -13,7 +15,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class RequestDispatcher {
-
+    private static final Logger logger = LogManager.getLogger(RequestDispatcher.class);
     private Map<String, RequestHandler<?>> handlers = new HashMap<>();
 
     public RequestDispatcher(Connection conn){
@@ -56,14 +58,18 @@ public class RequestDispatcher {
     }
 
     public ResponseEnvelope<?> dispatch(RequestEnvelope requestEnvelope, Connection conn){
-
+        logger.debug("Dispatching request: {} (ID: {})", requestEnvelope.getAction(), requestEnvelope.getCorrelationId());
         RequestHandler handler = handlers.get(requestEnvelope.getAction());
 
         if (handler == null){
+            logger.warn("No handler found for action: {}", requestEnvelope.getAction());
             return new ResponseEnvelope(requestEnvelope.getCorrelationId(),
                     "Unknown Action: " + requestEnvelope.getAction(), "FAIL", requestEnvelope.getAction());
         }
 
-        return handler.handleRequest(requestEnvelope, conn);
+        ResponseEnvelope<?> response = handler.handleRequest(requestEnvelope, conn);
+        logger.debug("Request {} (ID: {}) handled with status: {}", 
+            requestEnvelope.getAction(), requestEnvelope.getCorrelationId(), response.getStatus());
+        return response;
     }
 }

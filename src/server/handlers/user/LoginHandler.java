@@ -1,5 +1,7 @@
 package server.handlers.user;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import server.dispatcher.RequestHandler;
 import server.dto.LoginRequestDTO;
 import server.envelopes.RequestEnvelope;
@@ -14,6 +16,7 @@ import server.service.StudentService;
 import java.sql.Connection;
 
 public class LoginHandler implements RequestHandler<LoginRequestDTO> {
+    private static final Logger logger = LogManager.getLogger(LoginHandler.class);
     EmployeeService employeeService;
     StudentService studentService;
 
@@ -23,9 +26,11 @@ public class LoginHandler implements RequestHandler<LoginRequestDTO> {
     }
 
     public User loginBasedOnUserType(String id, String password) throws AuthenticationException {
+        logger.debug("Attempting login for ID: {}", id);
         User user = null;
 
         if (id==null || (id.length()!=5 && id.length()!=7)) {
+            logger.warn("Login failed: Invalid ID length for ID: {}", id);
             throw new AuthenticationException("Invalid ID Length");
         }
 
@@ -35,6 +40,12 @@ public class LoginHandler implements RequestHandler<LoginRequestDTO> {
 
         if (id.length() == 7) {
             user = studentService.login(id, password);
+        }
+
+        if (user != null) {
+            logger.info("Login successful for user: {} (ID: {})", user.getFirstName() + " " + user.getLastName(), id);
+        } else {
+            logger.warn("Login failed for ID: {}", id);
         }
 
         return user;

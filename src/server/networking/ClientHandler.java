@@ -1,5 +1,7 @@
 package server.networking;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import server.dispatcher.RequestDispatcher;
 import server.envelopes.RequestEnvelope;
 import server.envelopes.ResponseEnvelope;
@@ -13,6 +15,7 @@ import java.net.Socket;
 import java.sql.Connection;
 
 public class ClientHandler implements Runnable {
+    private static final Logger logger = LogManager.getLogger(ClientHandler.class);
     private Socket socket;
     private ObjectOutputStream out;
     private ObjectInputStream in;
@@ -28,11 +31,12 @@ public class ClientHandler implements Runnable {
 
     private void closeConnections(){
         try {
-            out.close();
-            in.close();
-            socket.close();
+            if (out != null) out.close();
+            if (in != null) in.close();
+            if (socket != null) socket.close();
+            logger.info("Closed connections for client {}", socket.getInetAddress());
         }catch (IOException ioe){
-            ioe.printStackTrace();//replace with throw or log
+            logger.error("Error closing client connections", ioe);
         }
     }
 
@@ -41,8 +45,9 @@ public class ClientHandler implements Runnable {
             out = new ObjectOutputStream(socket.getOutputStream());
             out.flush();
             in = new ObjectInputStream(socket.getInputStream());
+            logger.debug("Streams configured for client {}", socket.getInetAddress());
         }catch (IOException ioe){
-            ioe.printStackTrace();//replace with throw or log
+            logger.error("Error configuring streams for client {}", socket.getInetAddress(), ioe);
         }
     }
 
@@ -55,24 +60,26 @@ public class ClientHandler implements Runnable {
                 try{
 
                     RequestEnvelope<?> request = (RequestEnvelope<?>) in.readObject();
+                    logger.info("Received request: {} from client {}", request.getAction(), socket.getInetAddress());
                     ResponseEnvelope<?> response = dispatcher.dispatch(request, dbConn);
                     out.writeObject(response);
                     out.flush();
+                    logger.info("Sent response: {} to client {}", response.getStatus(), socket.getInetAddress());
 
                 }catch (ClassNotFoundException cnfe) {
-                    cnfe.printStackTrace();
+                    logger.error("ClassNotFoundException while reading request", cnfe);
 
                 }catch (ClassCastException ex) {
-                    ex.printStackTrace();
+                    logger.error("ClassCastException while reading request", ex);
                 }
 
             }
         }catch(EOFException eof){
-            eof.printStackTrace();
+            logger.info("Client {} disconnected", socket.getInetAddress());
         }catch(IOException ioe){
-            ioe.printStackTrace();
+            logger.error("IOException in ClientHandler run loop", ioe);
         }catch(Exception e){
-            e.printStackTrace();
+            logger.error("Unexpected exception in ClientHandler run loop", e);
         }
         closeConnections();
     }

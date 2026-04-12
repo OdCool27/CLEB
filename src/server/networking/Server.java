@@ -1,5 +1,7 @@
 package server.networking;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import server.dispatcher.RequestDispatcher;
 import server.dto.StudentDTO;
 import server.envelopes.RequestEnvelope;
@@ -18,6 +20,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class Server {
+    private static final Logger logger = LogManager.getLogger(Server.class);
     private ServerSocket serverSocket;
     private DBUtil dbUtil;
     private static final int PORT = 49494;
@@ -33,9 +36,11 @@ public class Server {
 
     private void createConnection(){
         try {
+            logger.info("Starting server on port {}", PORT);
             serverSocket = new ServerSocket(PORT);
+            logger.info("Server started successfully on port {}", PORT);
         } catch (IOException ioe) {
-            ioe.printStackTrace();
+            logger.error("Failed to start server on port {}", PORT, ioe);
         }
     }
 
@@ -43,15 +48,18 @@ public class Server {
 
     private void waitForRequest(){
         try {
+            logger.info("Waiting for client requests...");
             while(true){
-                Thread clientThread = new Thread(new ClientHandler(serverSocket.accept(), dbUtil.getDBConn()));
+                Socket clientSocket = serverSocket.accept();
+                logger.info("Accepted new client connection from {}", clientSocket.getInetAddress());
+                Thread clientThread = new Thread(new ClientHandler(clientSocket, dbUtil.getDBConn()));
                 clientThread.start();
             }
         } catch (IOException ioe) {
-            ioe.printStackTrace();
+            logger.error("IOException while waiting for request", ioe);
 
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Unexpected exception in waitForRequest", e);
 
         }
     }
