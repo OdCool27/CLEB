@@ -1,0 +1,2 @@
+2026-04-11 21:27:20.838 [DEBUG] [main] server.util.PasswordHashingUtil - Hashing password for user authentication
+2026-04-11 21:27:20.962 [DEBUG] [main] server.util.PasswordHashingUtil - Password hashed successfully

@@ -1,4 +1,4 @@
-package client.cli;
+package cli;
 
 import java.awt.Color;
 import java.awt.Cursor;
@@ -7,6 +7,7 @@ import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.util.UUID;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -20,13 +21,25 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.Border;
 
-import server.util.InputValidator;
+import controller.ClientController;
+import dto.LoginRequestDTO;
+import dto.UserDTO;
+import envelopes.RequestEnvelope;
+import envelopes.ResponseEnvelope;
+import model.User;
+import util.InputValidator;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import javax.swing.JPanel;
 import javax.swing.JSeparator;
 
 public class Login extends JFrame {
-	
+	private static final Logger logger = LogManager.getLogger(Login.class);
+
+	//ClientController - enables network connection
+	private ClientController controller;
+
 	//Email
 	private JLabel emailLabel;
 	private JTextField emailField;
@@ -38,7 +51,7 @@ public class Login extends JFrame {
 	//Roles
 	private JComboBox<String> roleComboBox;
 	
-	private final String[] role= {"Student", "Admin", "Technician"};
+	private final String[] role= {"Student", "Employee"};
 	
 	//Buttons
 	private JButton loginButton;
@@ -50,13 +63,14 @@ public class Login extends JFrame {
 
 	
 	public Login() {
-		setTitle("Campus Lab & Equiqment Booking");
+		logger.info("Initializing Login GUI...");
+		controller = new ClientController();
+		setTitle("Campus Lab & Equipment Booking");
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setResizable(false);
 		setLocationRelativeTo(null);
 		setVisible(true);
 		setSize(400, 500);
-		
 		initComponents();
 		pack();
 		
@@ -270,9 +284,12 @@ public class Login extends JFrame {
         String email = emailField.getText().trim();
         String password = new String(passwordField.getPassword());
         String role = (String) roleComboBox.getSelectedItem();
+
+		logger.info("Login attempt for email: {} with role: {}", email, role);
  
         //Validate email
         if (!InputValidator.validateEmail(email)) {
+			logger.warn("Invalid email format entered: {}", email);
             setStatus("Please enter a valid email address.", Color.RED);
             emailField.requestFocus();
             return;
@@ -280,6 +297,7 @@ public class Login extends JFrame {
  
         //Validate password
         if (!InputValidator.validatePassword(password)) {
+			logger.warn("Invalid password format entered for email: {}", email);
             setStatus("Please enter a valid password.", Color.RED);
             passwordField.requestFocus();
             return;
@@ -287,11 +305,31 @@ public class Login extends JFrame {
  
         //If both pass, proceed
         // TODO: Send login request to server via socket (Phase 2)
-        setStatus("Signing in as " + role + "...", new Color(26, 39, 68));
- 
+		LoginRequestDTO login = new LoginRequestDTO(email, password, role);
+		RequestEnvelope<LoginRequestDTO> envelope = new RequestEnvelope<>(UUID.randomUUID(), "LOGIN", login);
+		
+		logger.debug("Sending login request envelope: {}", envelope.getCorrelationId());
+		controller.sendRequest(envelope);
+		
+		ResponseEnvelope<UserDTO> responseEnvelope = controller.receiveResponse();
+		if (responseEnvelope == null) {
+			JOptionPane.showMessageDialog(this, "Unable to reach server.", "Login Failed", JOptionPane.ERROR_MESSAGE);
+			setStatus("Unable to reach server.", Color.RED);
+			return;
+		}
+		logger.info("Received login response: {} - {}", responseEnvelope.getStatus(), responseEnvelope.getMessage());
 
-        dispose(); //Close the login window
-        SwingUtilities.invokeLater(() -> new MainDashboard(email, role));
+		if(responseEnvelope.getStatus().equalsIgnoreCase("SUCCESS")) {
+			logger.info("Login successful for {}", email);
+			JOptionPane.showMessageDialog(this, responseEnvelope.getMessage(), "Login Success", JOptionPane.INFORMATION_MESSAGE);
+			dispose(); //Close the login window
+			SwingUtilities.invokeLater(() -> new MainDashboard((UserDTO) responseEnvelope.getPayload(), controller));
+		} else {
+			logger.warn("Login failed for {}: {}", email, responseEnvelope.getMessage());
+			JOptionPane.showMessageDialog(this, responseEnvelope.getMessage(), "Login Failed", JOptionPane.ERROR_MESSAGE);
+			setStatus(responseEnvelope.getMessage(), Color.RED);
+		}
+
     }
  
     private void handleClear() {
@@ -309,8 +347,9 @@ public class Login extends JFrame {
     }
 	 
 
-	public static void main(String[] args) {
-		//new Login();
-		SwingUtilities.invokeLater(Login::new);
-	}
+//	public static void main(String[] args) {
+//		//new Login();
+//		SwingUtilities.invokeLater(Login::new);
+//	}
 }
+

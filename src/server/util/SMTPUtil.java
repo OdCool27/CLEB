@@ -1,10 +1,11 @@
-package server.util;
+package util;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+
 import jakarta.mail.*;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
+import org.apache.logging.log4j.*;
+
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
@@ -12,7 +13,7 @@ import java.util.Properties;
 public class SMTPUtil {
     private static final Logger logger = LogManager.getLogger(SMTPUtil.class);
     private static final Properties smtpProps = new Properties();
-    private static final String propertiesFilePath = "src/server/smtp.properties";
+    private static final String propertiesFilePath = "src/main/resources/smtp.properties";
 
     static {
         try (FileInputStream input = new FileInputStream(propertiesFilePath)) {
@@ -34,7 +35,7 @@ public class SMTPUtil {
         props.put("mail.smtp.port", smtpProps.getProperty("mail.smtp.port"));
 
         Session session = Session.getInstance(props, new Authenticator() {
-            protected PasswordAuthentication getPasswordAuthentication() {
+            public PasswordAuthentication getPasswordAuthentication() {
                 return new PasswordAuthentication(username, password);
             }
         });

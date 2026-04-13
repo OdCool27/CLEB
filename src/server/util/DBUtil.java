@@ -1,13 +1,15 @@
-package server.util;
+package util;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
 import javax.swing.*;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class DBUtil {
+
     private static final Logger logger = LogManager.getLogger(DBUtil.class);
     private Connection dbConn;
     private final String URL = "jdbc:mysql://localhost:3307/cleb_db";
@@ -22,7 +24,7 @@ public class DBUtil {
         return dbConn;
     }
 
-    public void closeConnection() throws SQLException{
+    public void closeConnection() throws SQLException {
         try {
             if (dbConn != null) {
                 dbConn.close();
@@ -60,7 +62,4 @@ public class DBUtil {
         }
         return dbConn;
     }
-
-
-
 }

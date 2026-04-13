@@ -1,4 +1,4 @@
-package server.envelopes;
+package envelopes;
 
 import java.io.Serializable;
 import java.util.UUID;
@@ -25,5 +25,6 @@ public class RequestEnvelope<T> implements Serializable {
     public T getPayload() {
         return payload;
     }
+
 
 }

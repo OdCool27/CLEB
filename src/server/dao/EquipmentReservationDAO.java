@@ -1,18 +1,12 @@
-package server.dao;
+package dao;
 
-import server.model.EquipmentReservation;
-import server.model.Equipment;
-import server.model.Reservation;
-
+import model.Equipment;
+import model.EquipmentReservation;
+import model.Reservation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Timestamp;
+import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,9 +14,11 @@ import java.util.List;
 public class EquipmentReservationDAO {
     private static final Logger logger = LogManager.getLogger(EquipmentReservationDAO.class);
     private final Connection conn;
+    private final EquipmentDAO equipmentDAO;
 
     public EquipmentReservationDAO(Connection conn) {
         this.conn = conn;
+        this.equipmentDAO = new EquipmentDAO(conn);
     }
 
     // INITIALIZES EQUIPMENT RESERVATION TABLE IN DATABASE
@@ -319,8 +315,12 @@ public class EquipmentReservationDAO {
         String approvedBy = rs.getString("approvedBy");
         String equipmentID = rs.getString("equipmentID");
 
-        Equipment equipment = new Equipment();
-        equipment.setEquipmentID(equipmentID);
+        // Load the full equipment record so downstream DTOs include description and location.
+        Equipment equipment = equipmentDAO.getEquipmentById(equipmentID);
+        if (equipment == null) {
+            equipment = new Equipment();
+            equipment.setEquipmentID(equipmentID);
+        }
 
         EquipmentReservation reservation = new EquipmentReservation(
                 reservationID,

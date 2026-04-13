@@ -1,13 +1,16 @@
-package server.handlers;
+package handlers;
 
-import server.dispatcher.RequestHandler;
-import server.envelopes.RequestEnvelope;
-import server.envelopes.ResponseEnvelope;
-import server.model.Equipment;
-import server.service.EquipmentService;
+import dto.EquipmentDTO;
+import envelopes.RequestEnvelope;
+import envelopes.ResponseEnvelope;
+import model.Equipment;
+import model.Lab;
+import model.Location;
+import service.EquipmentService;
 
 import java.sql.Connection;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 public class EquipmentHandler implements RequestHandler<Object> {
@@ -25,9 +28,9 @@ public class EquipmentHandler implements RequestHandler<Object> {
         try {
             switch (action) {
                 case "ADD_EQUIPMENT":
-                    return addEquipment(request, (Equipment) payload);
+                    return addEquipment(request, (EquipmentDTO) payload);
                 case "UPDATE_EQUIPMENT":
-                    return updateEquipment(request, (Equipment) payload);
+                    return updateEquipment(request, (EquipmentDTO) payload);
                 case "DELETE_EQUIPMENT":
                     return deleteEquipment(request, (String) payload);
                 case "GET_EQUIPMENT":
@@ -48,13 +51,13 @@ public class EquipmentHandler implements RequestHandler<Object> {
         }
     }
 
-    private ResponseEnvelope<?> addEquipment(RequestEnvelope<Object> request, Equipment equipment) {
-        boolean success = equipmentService.addEquipment(equipment);
+    private ResponseEnvelope<?> addEquipment(RequestEnvelope<Object> request, EquipmentDTO e) {
+        boolean success = equipmentService.addEquipment(convertToModel(e));
         return new ResponseEnvelope<>(request.getCorrelationId(), success ? "Equipment added" : "Failed to add equipment", success ? "SUCCESS" : "FAIL", success);
     }
 
-    private ResponseEnvelope<?> updateEquipment(RequestEnvelope<Object> request, Equipment equipment) {
-        boolean success = equipmentService.updateEquipment(equipment);
+    private ResponseEnvelope<?> updateEquipment(RequestEnvelope<Object> request, EquipmentDTO equipment) {
+        boolean success = equipmentService.updateEquipment(convertToModel(equipment));
         return new ResponseEnvelope<>(request.getCorrelationId(), success ? "Equipment updated" : "Failed to update equipment", success ? "SUCCESS" : "FAIL", success);
     }
 
@@ -65,12 +68,17 @@ public class EquipmentHandler implements RequestHandler<Object> {
 
     private ResponseEnvelope<?> getEquipment(RequestEnvelope<Object> request, String id) {
         Equipment eq = equipmentService.getEquipmentById(id);
-        return new ResponseEnvelope<>(request.getCorrelationId(), eq != null ? "Equipment found" : "Equipment not found", eq != null ? "SUCCESS" : "FAIL", eq);
+        EquipmentDTO equipmentDTO = eq != null ? new EquipmentDTO(eq) : null;
+        return new ResponseEnvelope<>(request.getCorrelationId(), eq != null ? "Equipment found" : "Equipment not found", eq != null ? "SUCCESS" : "FAIL", equipmentDTO);
     }
 
     private ResponseEnvelope<?> getAllEquipment(RequestEnvelope<Object> request) {
         List<Equipment> list = equipmentService.getAllEquipment();
-        return new ResponseEnvelope<>(request.getCorrelationId(), "Equipment list retrieved", "SUCCESS", list);
+        List<EquipmentDTO> listDTO = new ArrayList<>();
+        for (Equipment equipment : list) {
+            listDTO.add(new EquipmentDTO(equipment));
+        }
+        return new ResponseEnvelope<>(request.getCorrelationId(), "Equipment list retrieved", "SUCCESS", listDTO);
     }
 
     private ResponseEnvelope<?> markMaintenance(RequestEnvelope<Object> request, String id) {
@@ -85,6 +93,34 @@ public class EquipmentHandler implements RequestHandler<Object> {
 
     private ResponseEnvelope<?> getAvailableAtTime(RequestEnvelope<Object> request, LocalDateTime time) {
         List<Equipment> list = equipmentService.getAvailableEquipmentAtTime(time);
-        return new ResponseEnvelope<>(request.getCorrelationId(), "Available equipment retrieved", "SUCCESS", list);
+        List<EquipmentDTO> listDTO = new ArrayList<>();
+        for (Equipment equipment : list) {
+            listDTO.add(new EquipmentDTO(equipment));
+        }
+        return new ResponseEnvelope<>(request.getCorrelationId(), "Available equipment retrieved", "SUCCESS", listDTO);
+    }
+    
+    
+    private Equipment convertToModel(EquipmentDTO equipment) {
+        Equipment e = new Equipment();
+        e.setEquipmentID(equipment.getEquipmentID());
+        e.setDescription(equipment.getDescription());
+        if (equipment.getLocation() != null) {
+            Lab lab = new Lab();
+            lab.setLabID(equipment.getLocation().getLabID());
+            lab.setName(equipment.getLocation().getName());
+            lab.setNumOfSeats(equipment.getLocation().getNumOfSeats());
+            if (equipment.getLocation().getLocation() != null) {
+                Location loc = new Location();
+                loc.setRoomName(equipment.getLocation().getLocation().getRoomName());
+                loc.setBuilding(equipment.getLocation().getLocation().getBuilding());
+                loc.setFloor(equipment.getLocation().getLocation().getFloor());
+                loc.setCampus(equipment.getLocation().getLocation().getCampus());
+                lab.setLocation(loc);
+            }
+            e.setLocation(lab);
+        }
+        e.setStatus(equipment.getStatus());
+        return e;
     }
 }

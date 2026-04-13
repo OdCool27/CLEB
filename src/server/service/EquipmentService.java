@@ -1,10 +1,10 @@
-package server.service;
+package service;
 
-import server.dao.EquipmentDAO;
-import server.dao.EquipmentReservationDAO;
-import server.model.Equipment;
-import server.model.EquipmentReservation;
-import server.model.Reservation;
+import dao.EquipmentDAO;
+import dao.EquipmentReservationDAO;
+import model.Equipment;
+import model.EquipmentReservation;
+import model.Reservation;
 
 import java.sql.Connection;
 import java.time.LocalDateTime;

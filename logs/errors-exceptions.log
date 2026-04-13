@@ -1,0 +1,8 @@
+2026-04-12 00:09:26.702 [INFO ] [main] server.util.DBUtil - Successfully connected to database
+
+2026-04-12 00:09:28.380 [INFO ] [main] server.util.DatabaseInitializer - Successfully initialized tables
+
+2026-04-12 14:05:18.955 [INFO ] [main] server.util.DBUtil - Successfully connected to database
+
+2026-04-12 14:05:20.438 [INFO ] [main] server.util.DatabaseInitializer - Successfully initialized tables
+

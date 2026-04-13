@@ -1,7 +1,8 @@
-package server.dao;
-import server.dto.StudentDTO;
-import server.model.Student;
-import server.model.User;
+package dao;
+
+import dto.UserDTO;
+import model.Student;
+import model.User;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -12,6 +13,7 @@ import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class StudentDAO {
     private static final Logger logger = LogManager.getLogger(StudentDAO.class);
@@ -47,8 +49,14 @@ public class StudentDAO {
         return false;
     }
 
-    //---------------------------CREATE OPERATION------------------------------------
-    public boolean saveStudent(Student student){
+    //SAVES STUDENT RECORD TO DB
+    public boolean saveStudent(Student student) {
+        boolean userSaved = userDAO.saveUser(student);//SAVES USER FIRST
+
+        if (!userSaved) {
+            logger.error("User record was not saved, so student cannot be saved: {}", student.getStudentID());
+            return false;
+        }
 
         String sql = "INSERT INTO Student (userID, studentID, faculty, school) VALUES (?, ?, ?, ?)";
 
@@ -57,7 +65,6 @@ public class StudentDAO {
             pstmt.setString(2, student.getStudentID());
             pstmt.setString(3, student.getFaculty());
             pstmt.setString(4, student.getSchool());
-
 
             int rowsInserted = pstmt.executeUpdate();
             if (rowsInserted > 0) {
@@ -71,9 +78,9 @@ public class StudentDAO {
             logger.error("Unexpected error while saving student", e);
         }
 
-
         return false;
     }
+
 
     //-------------------------------READ OPERATIONS----------------------------------------------
 
@@ -95,7 +102,7 @@ public class StudentDAO {
                 String email = rs.getString("email");
                 String passwordHash = rs.getString("passwordHash");
                 User.Role userRole = User.Role.valueOf(rs.getString("role"));
-                boolean active = rs.getBoolean("active");
+                boolean active = rs.getBoolean("isActive");
                 LocalDateTime lastUpdated = rs.getTimestamp("lastUpdated").toLocalDateTime();
 
                 String studentID = rs.getString("studentID");
@@ -133,7 +140,7 @@ public class StudentDAO {
                 String email = rs.getString("email");
                 String passwordHash = rs.getString("passwordHash");
                 User.Role userRole = User.Role.valueOf(rs.getString("role"));
-                boolean active = rs.getBoolean("active");
+                boolean active = rs.getBoolean("isActive");
                 LocalDateTime lastUpdated = rs.getTimestamp("lastUpdated").toLocalDateTime();
 
                 String studentID = rs.getString("studentID");
@@ -168,7 +175,7 @@ public class StudentDAO {
                 String email = rs.getString("email");
                 String passwordHash = rs.getString("passwordHash");
                 User.Role userRole = User.Role.valueOf(rs.getString("role"));
-                boolean active = rs.getBoolean("active");
+                boolean active = rs.getBoolean("isActive");
                 LocalDateTime lastUpdated = rs.getTimestamp("lastUpdated").toLocalDateTime();
 
                 String studentID = rs.getString("studentID");
@@ -198,6 +205,21 @@ public class StudentDAO {
 
     //UPDATE STUDENT AND USER TABLE
     public boolean updateStudent(Student student){
+        Student existingStudent = getStudentByStudentId(student.getStudentID());
+        UserDTO existingUser = userDAO.getUserById(student.getUserID());
+
+        boolean userFieldsChanged = existingUser == null
+                || !Objects.equals(student.getFirstName(), existingUser.getFirstName())
+                || !Objects.equals(student.getLastName(), existingUser.getLastName())
+                || !Objects.equals(student.getEmail(), existingUser.getEmail())
+                || student.getRole() != existingUser.getRole()
+                || student.isActive() != existingUser.isActive()
+                || !Objects.equals(student.getPasswordHash(), userDAO.getPasswordHashByUserId(student.getUserID()));
+
+        boolean studentFieldsChanged = existingStudent == null
+                || !Objects.equals(student.getFaculty(), existingStudent.getFaculty())
+                || !Objects.equals(student.getSchool(), existingStudent.getSchool());
+
         boolean userUpdated = userDAO.updateUser(student);//Updates User table - May not yield any result based on what has been changed
 
         String sql = "UPDATE Student SET " +
@@ -213,11 +235,21 @@ public class StudentDAO {
             int rowsUpdated = pstmt.executeUpdate();
             boolean studentUpdated = rowsUpdated > 0;
 
-            if (studentUpdated || userUpdated) {
+            if (userFieldsChanged && !userUpdated) {
+                logger.warn("Student update aborted because the shared User row was not updated for userID: {}", student.getUserID());
+                return false;
+            }
+
+            if (studentFieldsChanged && !studentUpdated) {
+                logger.warn("Student update aborted because the Student row was not updated for studentID: {}", student.getStudentID());
+                return false;
+            }
+
+            if (studentUpdated || userUpdated || (!userFieldsChanged && !studentFieldsChanged)) {
                 logger.info("Student updated successfully: {}", student.getStudentID());
             }
 
-            return studentUpdated || userUpdated; //IF SOMETHING IS UPDATED THEN RETURN TRUE
+            return studentUpdated || userUpdated || (!userFieldsChanged && !studentFieldsChanged);
 
         }catch(SQLException sqle){
             logger.error("Failed to update Student: {}", student.getStudentID(), sqle);

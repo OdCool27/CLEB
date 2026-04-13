@@ -1,9 +1,8 @@
-package server.util;
+package util;
 
+import dao.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
-import server.dao.*;
 
 import java.sql.Connection;
 

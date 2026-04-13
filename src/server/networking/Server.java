@@ -1,28 +1,22 @@
-package server.networking;
+package networking;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import server.dispatcher.RequestDispatcher;
-import server.dto.StudentDTO;
-import server.envelopes.RequestEnvelope;
-import server.envelopes.ResponseEnvelope;
-import server.model.User;
-import server.util.DBUtil;
+import service.ReservationCompletionMonitor;
+import util.DBUtil;
 
-import javax.swing.*;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class Server {
     private static final Logger logger = LogManager.getLogger(Server.class);
     private ServerSocket serverSocket;
     private DBUtil dbUtil;
+    private ScheduledExecutorService scheduler;
     private static final int PORT = 49494;
 
 
@@ -30,6 +24,7 @@ public class Server {
     public Server() {
         dbUtil = new DBUtil();
         createConnection();
+        startReservationMonitor();
         waitForRequest();
     }
 
@@ -42,6 +37,23 @@ public class Server {
         } catch (IOException ioe) {
             logger.error("Failed to start server on port {}", PORT, ioe);
         }
+    }
+
+    private void startReservationMonitor() {
+        scheduler = Executors.newSingleThreadScheduledExecutor();
+        ReservationCompletionMonitor monitor = new ReservationCompletionMonitor(dbUtil.getDBConn());
+
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                int completed = monitor.completeElapsedReservations();
+                if (completed > 0) {
+                    logger.info("Auto-completed {} reservations", completed);
+                    ClientRegistry.broadcastReservationUpdate();
+                }
+            } catch (Exception e) {
+                logger.error("Error while running reservation completion monitor", e);
+            }
+        }, 0, 1, TimeUnit.MINUTES);
     }
 
 

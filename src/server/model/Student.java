@@ -1,6 +1,8 @@
-package server.model;
+package model;
 
-import java.time.LocalDateTime;public class Student extends User {
+import java.time.LocalDateTime;
+
+public class Student extends User{
     private String studentID;
     private String faculty;
     private String school;

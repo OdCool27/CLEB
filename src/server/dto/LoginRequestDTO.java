@@ -1,25 +1,26 @@
-package server.dto;
+package dto;
 
-public class LoginRequestDTO {
-    private String id;
+import java.io.Serializable;
+
+public class LoginRequestDTO implements Serializable {
+    private String email;
     private String password;
+    private String role;
 
-    public LoginRequestDTO(String id, String password) {
-        this.id = id;
+    public LoginRequestDTO(String email, String password, String role) {
+        this.email = email;
         this.password = password;
+        this.role = role;
     }
 
-    public String getId() {
-        return id;
-    }
-    public void setId(String id) {
-        this.id = id;
+    public String getEmail() {
+        return email;
     }
     public String getPassword() {
         return password;
     }
-    public void setPassword(String password) {
-        this.password = password;
+    public String getRole() {
+        return role;
     }
 
 }

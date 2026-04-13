@@ -1,17 +1,15 @@
 package server.networking;
 
+import dispatcher.RequestDispatcher;
+import envelopes.RequestEnvelope;
+import envelopes.ResponseEnvelope;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import server.dispatcher.RequestDispatcher;
-import server.envelopes.RequestEnvelope;
-import server.envelopes.ResponseEnvelope;
 
-import java.io.EOFException;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
+import java.io.ObjectStreamClass;
 import java.net.Socket;
-
+import java.net.SocketException;
 import java.sql.Connection;
 
 public class ClientHandler implements Runnable {
@@ -44,10 +42,63 @@ public class ClientHandler implements Runnable {
         try {
             out = new ObjectOutputStream(socket.getOutputStream());
             out.flush();
-            in = new ObjectInputStream(socket.getInputStream());
+            in = new CompatibleObjectInputStream(socket.getInputStream());
             logger.debug("Streams configured for client {}", socket.getInetAddress());
         }catch (IOException ioe){
             logger.error("Error configuring streams for client {}", socket.getInetAddress(), ioe);
+        }
+    }
+
+    public synchronized boolean sendResponse(ResponseEnvelope<?> response) {
+        try {
+            if (out == null) {
+                return false;
+            }
+            out.writeObject(response);
+            out.flush();
+            return true;
+        } catch (IOException ioe) {
+            logger.error("Error sending response to client {}", socket.getInetAddress(), ioe);
+            return false;
+        }
+    }
+
+    /**
+     * Helps the server read serialized objects even when the runtime classloader
+     * or older package names differ from the current source layout.
+     */
+    private static class CompatibleObjectInputStream extends ObjectInputStream {
+        CompatibleObjectInputStream(InputStream inputStream) throws IOException {
+            super(inputStream);
+        }
+
+        @Override
+        protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
+            String className = desc.getName();
+
+            try {
+                return super.resolveClass(desc);
+            } catch (ClassNotFoundException ignored) {
+                for (String candidate : remapCandidates(className)) {
+                    try {
+                        return Class.forName(candidate, false, Thread.currentThread().getContextClassLoader());
+                    } catch (ClassNotFoundException ignoredAgain) {
+                        try {
+                            return Class.forName(candidate, false, ClientHandler.class.getClassLoader());
+                        } catch (ClassNotFoundException ignoredOnceMore) {
+                            // Keep trying candidates.
+                        }
+                    }
+                }
+                throw new ClassNotFoundException(className);
+            }
+        }
+
+        private String[] remapCandidates(String className) {
+            if (className.startsWith("server.")) {
+                return new String[]{className, className.substring("server.".length())};
+            }
+            return new String[]{className, "server." + className};
         }
     }
 
@@ -55,6 +106,7 @@ public class ClientHandler implements Runnable {
     public void run() {
         try{
             configureStreams();
+            ClientRegistry.register(this);
 
             while(true){
                 try{
@@ -62,8 +114,7 @@ public class ClientHandler implements Runnable {
                     RequestEnvelope<?> request = (RequestEnvelope<?>) in.readObject();
                     logger.info("Received request: {} from client {}", request.getAction(), socket.getInetAddress());
                     ResponseEnvelope<?> response = dispatcher.dispatch(request, dbConn);
-                    out.writeObject(response);
-                    out.flush();
+                    sendResponse(response);
                     logger.info("Sent response: {} to client {}", response.getStatus(), socket.getInetAddress());
 
                 }catch (ClassNotFoundException cnfe) {
@@ -71,6 +122,14 @@ public class ClientHandler implements Runnable {
 
                 }catch (ClassCastException ex) {
                     logger.error("ClassCastException while reading request", ex);
+
+                }catch (SocketException se) {
+                    logger.info("Client {} triggered a SocketException: " + se.getMessage(), socket.getInetAddress());
+                    break;
+
+                }catch (EOFException eofe) {
+                    logger.info("Client {} connection reset/closed:" + eofe.getMessage(), socket.getInetAddress());
+                    break;
                 }
 
             }
@@ -80,7 +139,9 @@ public class ClientHandler implements Runnable {
             logger.error("IOException in ClientHandler run loop", ioe);
         }catch(Exception e){
             logger.error("Unexpected exception in ClientHandler run loop", e);
+        }finally{
+            ClientRegistry.unregister(this);
+            closeConnections();
         }
-        closeConnections();
     }
 }

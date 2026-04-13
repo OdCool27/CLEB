@@ -1,0 +1,6 @@
+2026-04-11 15:30:05.151 [DEBUG] [main] server.util.DBUtil - Attempting to connect to database at URL: jdbc:mysql://localhost:3307/cleb_db
+2026-04-11 15:30:05.492 [INFO ] [main] server.util.DBUtil - Successfully connected to database
+2026-04-11 15:33:38.957 [DEBUG] [main] server.util.DBUtil - Attempting to connect to database at URL: jdbc:mysql://localhost:3307/cleb_db
+2026-04-11 15:33:39.221 [INFO ] [main] server.util.DBUtil - Successfully connected to database
+2026-04-11 15:35:36.296 [DEBUG] [main] server.util.DBUtil - Attempting to connect to database at URL: jdbc:mysql://localhost:3307/cleb_db
+2026-04-11 15:35:36.598 [INFO ] [main] server.util.DBUtil - Successfully connected to database

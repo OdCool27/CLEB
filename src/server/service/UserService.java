@@ -1,7 +1,7 @@
-package server.service;
+package service;
 
-import server.exception.AuthenticationException;
-import server.model.User;
+import exception.AuthenticationException;
+import model.User;
 
 public interface UserService {
     public boolean createUser(User user);

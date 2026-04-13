@@ -1,14 +1,10 @@
-package server.dispatcher;
+package dispatcher;
 
+import envelopes.RequestEnvelope;
+import envelopes.ResponseEnvelope;
+import handlers.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import server.envelopes.RequestEnvelope;
-import server.envelopes.ResponseEnvelope;
-import server.handlers.EquipmentHandler;
-import server.handlers.LabHandler;
-import server.handlers.ReservationHandler;
-import server.handlers.user.LoginHandler;
-import server.handlers.user.UserHandler;
 
 import java.sql.Connection;
 import java.util.HashMap;
@@ -20,7 +16,7 @@ public class RequestDispatcher {
 
     public RequestDispatcher(Connection conn){
         handlers.put("LOGIN", new LoginHandler(conn));
-        
+
         UserHandler userHandler = new UserHandler(conn);
         handlers.put("CREATE_USER", userHandler);
         handlers.put("UPDATE_USER", userHandler);
@@ -42,6 +38,8 @@ public class RequestDispatcher {
         handlers.put("GET_SEATS_BY_LAB", labHandler);
         handlers.put("GET_AVAILABLE_SEATS_AT_TIME", labHandler);
         handlers.put("ADD_LAB", labHandler);
+        handlers.put("UPDATE_LAB", labHandler);
+        handlers.put("DELETE_LAB", labHandler);
         handlers.put("ADD_LAB_SEAT", labHandler);
 
         ReservationHandler reservationHandler = new ReservationHandler(conn);
@@ -55,6 +53,8 @@ public class RequestDispatcher {
         handlers.put("GET_ALL_LAB_SEAT_RESERVATIONS", reservationHandler);
         handlers.put("APPROVE_EQUIPMENT_RESERVATION", reservationHandler);
         handlers.put("APPROVE_LAB_SEAT_RESERVATION", reservationHandler);
+        handlers.put("REJECT_EQUIPMENT_RESERVATION", reservationHandler);
+        handlers.put("REJECT_LAB_SEAT_RESERVATION", reservationHandler);
     }
 
     public ResponseEnvelope<?> dispatch(RequestEnvelope requestEnvelope, Connection conn){
@@ -68,8 +68,8 @@ public class RequestDispatcher {
         }
 
         ResponseEnvelope<?> response = handler.handleRequest(requestEnvelope, conn);
-        logger.debug("Request {} (ID: {}) handled with status: {}", 
-            requestEnvelope.getAction(), requestEnvelope.getCorrelationId(), response.getStatus());
+        logger.debug("Request {} (ID: {}) handled with status: {}",
+                requestEnvelope.getAction(), requestEnvelope.getCorrelationId(), response.getStatus());
         return response;
     }
 }

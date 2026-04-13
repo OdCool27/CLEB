@@ -1,12 +1,12 @@
-package server.service;
+package service;
 
-import server.dao.LabDAO;
-import server.dao.LabSeatDAO;
-import server.dao.LabSeatReservationDAO;
-import server.model.Lab;
-import server.model.LabSeat;
-import server.model.LabSeatReservation;
-import server.model.Reservation;
+import dao.LabDAO;
+import dao.LabSeatDAO;
+import dao.LabSeatReservationDAO;
+import model.Lab;
+import model.LabSeat;
+import model.LabSeatReservation;
+import model.Reservation;
 
 import java.sql.Connection;
 import java.time.LocalDateTime;

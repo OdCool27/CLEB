@@ -1,20 +1,18 @@
-package server.dao;
+package dao;
 
-import server.model.Employee;
-import server.model.User;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import dto.UserDTO;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Objects;
 
+import model.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class EmployeeDAO {
     private static final Logger logger = LogManager.getLogger(EmployeeDAO.class);
@@ -55,6 +53,12 @@ public class EmployeeDAO {
 
     //CREATES EMPLOYEE RECORD
     public boolean saveEmployee(Employee employee){
+        // Save the shared User record first so we get a generated userID for the Employee table.
+        boolean userSaved = userDAO.saveUser(employee);
+        if (!userSaved) {
+            logger.error("User record was not saved, so employee cannot be saved: {}", employee.getEmpID());
+            return false;
+        }
 
         String sql = "INSERT INTO Employee (userID, empID, jobTitle) VALUES (?, ?, ?)";
 
@@ -70,6 +74,8 @@ public class EmployeeDAO {
             return rowsInserted > 0;
 
         }catch(SQLException sqle){
+            // Remove the previously inserted User row so we do not leave behind an orphaned login.
+            userDAO.deleteUser(employee.getUserID());
             logger.error("Failed to save employee: {}", employee.getEmpID(), sqle);
         }catch(Exception e){
             logger.error("Unexpected error while saving employee", e);
@@ -85,7 +91,7 @@ public class EmployeeDAO {
     public Employee getEmployeeById(String inputtedEmpID){
         String sql = "SELECT * " +
                 "FROM `User` u " +
-                "INNER JOIN Emploee emp ON u.userID = emp.userID " +
+                "INNER JOIN Employee emp ON u.userID = emp.userID " +
                 "WHERE emp.empID = ?";
 
         try(PreparedStatement pstmt = conn.prepareStatement(sql)){
@@ -100,7 +106,7 @@ public class EmployeeDAO {
                 String email = rs.getString("email");
                 String passwordHash = rs.getString("passwordHash");
                 User.Role userRole = User.Role.valueOf(rs.getString("role"));
-                boolean active = rs.getBoolean("active");
+                boolean active = rs.getBoolean("isActive");
                 LocalDateTime lastUpdated = rs.getTimestamp("lastUpdated").toLocalDateTime();
 
                 String empID = rs.getString("empID");
@@ -125,7 +131,7 @@ public class EmployeeDAO {
     public Employee getEmployeeByEmail(String inputtedEmail){
         String sql = "SELECT * " +
                 "FROM `User` u " +
-                "INNER JOIN Emploee emp ON u.userID = emp.userID " +
+                "INNER JOIN Employee emp ON u.userID = emp.userID " +
                 "WHERE u.email = ?";
 
         try(PreparedStatement pstmt = conn.prepareStatement(sql)){
@@ -140,7 +146,7 @@ public class EmployeeDAO {
                 String email = rs.getString("email");
                 String passwordHash = rs.getString("passwordHash");
                 User.Role userRole = User.Role.valueOf(rs.getString("role"));
-                boolean active = rs.getBoolean("active");
+                boolean active = rs.getBoolean("isActive");
                 LocalDateTime lastUpdated = rs.getTimestamp("lastUpdated").toLocalDateTime();
 
                 String empID = rs.getString("empID");
@@ -177,7 +183,7 @@ public class EmployeeDAO {
                 String email = rs.getString("email");
                 String passwordHash = rs.getString("passwordHash");
                 User.Role userRole = User.Role.valueOf(rs.getString("role"));
-                boolean active = rs.getBoolean("active");
+                boolean active = rs.getBoolean("isActive");
                 LocalDateTime lastUpdated = rs.getTimestamp("lastUpdated").toLocalDateTime();
 
                 String empID = rs.getString("empID");
@@ -205,10 +211,24 @@ public class EmployeeDAO {
 
     //UPDATES EMPLOYEE RECORD
     public boolean updateEmployee(Employee employee){
+        Employee existingEmployee = getEmployeeById(employee.getEmpID());
+        UserDTO existingUser = userDAO.getUserById(employee.getUserID());
+
+        boolean userFieldsChanged = existingUser == null
+                || !Objects.equals(employee.getFirstName(), existingUser.getFirstName())
+                || !Objects.equals(employee.getLastName(), existingUser.getLastName())
+                || !Objects.equals(employee.getEmail(), existingUser.getEmail())
+                || employee.getRole() != existingUser.getRole()
+                || employee.isActive() != existingUser.isActive()
+                || !Objects.equals(employee.getPasswordHash(), userDAO.getPasswordHashByUserId(employee.getUserID()));
+
+        boolean employeeFieldsChanged = existingEmployee == null
+                || !Objects.equals(employee.getJobTitle(), existingEmployee.getJobTitle());
+
         boolean userUpdated = userDAO.updateUser(employee);
 
         String sql = "UPDATE Employee SET " +
-                "jobTitle = ?, " +
+                "jobTitle = ? " +
                 "WHERE empID = ?";
 
         try(PreparedStatement pstmt = conn.prepareStatement(sql)){
@@ -218,11 +238,21 @@ public class EmployeeDAO {
             int rowsUpdated = pstmt.executeUpdate();
             boolean employeeUpdated = rowsUpdated > 0;
 
-            if (employeeUpdated || userUpdated) {
+            if (userFieldsChanged && !userUpdated) {
+                logger.warn("Employee update aborted because the shared User row was not updated for userID: {}", employee.getUserID());
+                return false;
+            }
+
+            if (employeeFieldsChanged && !employeeUpdated) {
+                logger.warn("Employee update aborted because the Employee row was not updated for empID: {}", employee.getEmpID());
+                return false;
+            }
+
+            if (employeeUpdated || userUpdated || (!userFieldsChanged && !employeeFieldsChanged)) {
                 logger.info("Employee updated successfully: {}", employee.getEmpID());
             }
 
-            return employeeUpdated || userUpdated; //IF SOMETHING IS UPDATED THEN RETURN TRUE
+            return employeeUpdated || userUpdated || (!userFieldsChanged && !employeeFieldsChanged);
 
         }catch(SQLException sqle){
             logger.error("Failed to update employee: {}", employee.getEmpID(), sqle);
@@ -274,5 +304,4 @@ public class EmployeeDAO {
 
         return false;
     }
-
 }

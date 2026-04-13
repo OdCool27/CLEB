@@ -1,9 +1,10 @@
-package server.service;
+package service;
 
-import server.model.Reservation;import server.model.User;import server.util.SMTPUtil;
+import model.Reservation;
+import model.User;
+import util.SMTPUtil;
 
 public class NotificationService {
-
     public static void sendReservationCreationNotification(String to, Reservation reservationDetails) {
         String subject = "CLEB Reservation Created Successfully";
         String content = "<h1>Reservation Confirmation</h1>" +

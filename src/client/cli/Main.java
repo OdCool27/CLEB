@@ -1,12 +1,13 @@
-package client.cli;
+package cli;
 
 
-import server.model.Student;
-import server.model.User;
+import javax.swing.*;
 
 public class Main {
     public static void main(String[] args) {
-        Student user = new Student();
-        System.out.println(user);
+        //Login.main(args);
+//        SwingUtilities.invokeLater(Login::new);
+        new Login();
     }
 }
+

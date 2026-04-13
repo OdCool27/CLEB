@@ -1,4 +1,14 @@
-package client.cli;
+package cli;
+
+import controller.ClientController;
+import dto.EquipmentReservationDTO;
+import dto.LabSeatReservationDTO;
+import dto.StudentDTO;
+import dto.UserDTO;
+import envelopes.RequestEnvelope;
+import envelopes.ResponseEnvelope;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 import java.awt.Font;
 import java.awt.GridBagLayout;
@@ -9,6 +19,9 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.util.UUID;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -18,10 +31,17 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.SwingConstants;
+import javax.swing.RowFilter;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
+import javax.swing.event.InternalFrameAdapter;
+import javax.swing.event.InternalFrameEvent;
 
 public class Dashboard extends JInternalFrame{
+    ClientController clientController;
+
 	 // Components
     private JLabel activeCountLabel;
     private JLabel pendingCountLabel;
@@ -36,6 +56,9 @@ public class Dashboard extends JInternalFrame{
     private JButton refreshBtn;
     private JPanel btnRow;
     private JScrollPane scrollPane;
+    private JTextField searchField;
+    private JPanel searchPanel;
+    private TableRowSorter<DefaultTableModel> tableSorter;
     
     // Data fields
     private String currentUser;
@@ -84,20 +107,35 @@ public class Dashboard extends JInternalFrame{
     private static final Font TABLE_HEADER_FONT = new Font("SansSerif", Font.BOLD, TABLE_FONT_SIZE);
     private static final Font BUTTON_FONT = new Font("SansSerif", Font.BOLD, TABLE_FONT_SIZE);
     
-    public Dashboard(String username, String role) {
-        super("My Reservations - Dashboard", true, true, true, true);
-        this.currentUser = username;
-        this.currentRole = role;
+    private UserDTO userDTO;
+    private final Runnable reservationUpdateListener;
+
+    public Dashboard(UserDTO userDTO, ClientController clientController) {
+        super(userDTO instanceof StudentDTO ? "My Reservations - Dashboard" : "Reservation Dashboard", true, true, true, true);
+        this.userDTO = userDTO;
+        this.currentUser = userDTO.getFirstName();
+        this.currentRole = userDTO.getRole().name();
+        this.clientController = clientController;
+        this.reservationUpdateListener = this::refreshTableSilently;
         
         this.initializeComponents();
         this.setupWelcomeLabel();
         this.setupStatsPanel();
         this.setupTableTitle();
         this.setupTablePanel();
+        this.setupSearchPanel();
         this.setupRefreshButton();
         this.setupMainPanel();
         this.setWindowProperties();
-        this.loadSampleData();
+        this.registerListeners();
+        this.clientController.addReservationUpdateListener(reservationUpdateListener);
+        this.addInternalFrameListener(new InternalFrameAdapter() {
+            @Override
+            public void internalFrameClosed(InternalFrameEvent e) {
+                clientController.removeReservationUpdateListener(reservationUpdateListener);
+            }
+        });
+        this.loadData(userDTO, clientController);
     }
     
     public void initializeComponents() {
@@ -131,6 +169,9 @@ public class Dashboard extends JInternalFrame{
         this.scrollPane = new JScrollPane(reservationsTable);
         this.tablePanel = new JPanel(new BorderLayout());
         this.tablePanel.setBackground(Color.WHITE);
+        this.searchField = new JTextField();
+        this.searchPanel = new JPanel(new BorderLayout(8, 0));
+        this.searchPanel.setBackground(Color.WHITE);
         
         // Button
         this.refreshBtn = new JButton("Refresh");
@@ -145,6 +186,9 @@ public class Dashboard extends JInternalFrame{
         welcomeLabel.setText("Welcome back, " + currentUser);
         welcomeLabel.setFont(WELCOME_FONT);
         welcomeLabel.setForeground(WELCOME_FG);
+        if (!"STUDENT".equalsIgnoreCase(currentRole)) {
+            tableTitle.setText("Reservation Dashboard");
+        }
     }
     
     public void setupStatsPanel() {
@@ -160,7 +204,7 @@ public class Dashboard extends JInternalFrame{
         statsPanel.add(buildStatCard("Pending Approval", pendingCountLabel, CARD_PENDING_BG), gbc);
         gbc.gridx = 2;
         gbc.insets = new Insets(0, 0, 0, 0);
-        statsPanel.add(buildStatCard("Completed", completedCountLabel, CARD_COMPLETED_BG), gbc);
+        statsPanel.add(buildStatCard("Cancelled", completedCountLabel, CARD_COMPLETED_BG), gbc);
     }
     
     public void setupTableTitle() {
@@ -182,12 +226,24 @@ public class Dashboard extends JInternalFrame{
         reservationsTable.getColumnModel().getColumn(1).setPreferredWidth(COLUMN_RESOURCE_WIDTH);
         reservationsTable.getColumnModel().getColumn(2).setPreferredWidth(COLUMN_DATETIME_WIDTH);
         reservationsTable.getColumnModel().getColumn(3).setPreferredWidth(COLUMN_STATUS_WIDTH);
+        tableSorter = new TableRowSorter<>(tableModel);
+        reservationsTable.setRowSorter(tableSorter);
         
         scrollPane.setBorder(BorderFactory.createLineBorder(CARD_BORDER_COLOR));
         
         scrollPane.setPreferredSize(new Dimension(0, 200)); 
         
         tablePanel.add(scrollPane, BorderLayout.CENTER);
+    }
+
+    public void setupSearchPanel() {
+        JLabel searchLabel = new JLabel("Search");
+        searchLabel.setForeground(HEADER_COLOR);
+        searchField.setPreferredSize(new Dimension(220, 32));
+        searchField.setToolTipText("Filter by booking ID, resource, date, or status");
+
+        searchPanel.add(searchLabel, BorderLayout.WEST);
+        searchPanel.add(searchField, BorderLayout.CENTER);
     }
     
     public void setupRefreshButton() {
@@ -224,6 +280,11 @@ public class Dashboard extends JInternalFrame{
         gbc.gridy = row++;
         gbc.insets = new Insets(0, 0, 6, 0);
         mainPanel.add(tableTitle, gbc);
+
+        //Search row
+        gbc.gridy = row++;
+        gbc.insets = new Insets(0, 0, 10, 0);
+        mainPanel.add(searchPanel, gbc);
         
         //Table panel
         gbc.gridy = row++;
@@ -249,6 +310,12 @@ public class Dashboard extends JInternalFrame{
     
     public void registerListeners() {
         this.refreshBtn.addActionListener(e -> refreshTable());
+        this.searchField.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyReleased(KeyEvent e) {
+                applyFilter(searchField.getText());
+            }
+        });
     }
     
     //Business methods
@@ -280,37 +347,145 @@ public class Dashboard extends JInternalFrame{
         return card;
     }
     
-    private void loadSampleData() {
+    private void loadData(UserDTO userDTO, ClientController clientController) {
         tableModel.setRowCount(0);
-        
-        // TODO: Replace with actual server request (Phase 2)
-        Object[][] sampleData = {
-            {"R-1041", "SCIT Software Eng. Lab — Seat 12",  "25 Mar 2026, 10:00 AM", "Approved"},
-            {"R-1038", "EQ-OSC-2210 — Oscilloscope",        "24 Mar 2026, 02:00 PM", "Pending"},
-            {"R-1029", "SCIT Networking Lab — Seat 5",       "20 Mar 2026, 09:00 AM", "Completed"},
-            {"R-1020", "EQ-3DP-0007 — 3D Printer (metal)",  "15 Mar 2026, 01:00 PM", "Completed"},
-        };
-        
-        for (Object[] row : sampleData) {
-            tableModel.addRow(row);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a");
+
+        if (userDTO instanceof StudentDTO s) {
+            // Fetch Equipment Reservations
+            RequestEnvelope<String> requestEquipment = new RequestEnvelope<>(
+                    UUID.randomUUID(),
+                    "GET_EQUIPMENT_RESERVATIONS_BY_STUDENT",
+                    s.getStudentID()
+            );
+            clientController.sendRequest(requestEquipment);
+            ResponseEnvelope<List<EquipmentReservationDTO>> responseEquipment = clientController.receiveResponse();
+
+            if (responseEquipment != null && responseEquipment.getPayload() != null) {
+                List<EquipmentReservationDTO> eqList = responseEquipment.getPayload();
+                for (EquipmentReservationDTO res : eqList) {
+                    tableModel.addRow(new Object[]{
+                            "EQ-" + res.getReservationID(),
+                            res.getReservedItem() != null ? res.getReservedItem().getDescription() : "Equipment",
+                            res.getDateTime().format(formatter),
+                            formatStatus(res.getApprovalStatus().name())
+                    });
+                }
+            }
+
+            // Fetch Lab Seat Reservations
+            RequestEnvelope<String> requestLab = new RequestEnvelope<>(
+                    UUID.randomUUID(),
+                    "GET_LAB_SEAT_RESERVATIONS_BY_STUDENT",
+                    s.getStudentID()
+            );
+            clientController.sendRequest(requestLab);
+            ResponseEnvelope<List<LabSeatReservationDTO>> responseLab = clientController.receiveResponse();
+
+            if (responseLab != null && responseLab.getPayload() != null) {
+                List<LabSeatReservationDTO> lsList = responseLab.getPayload();
+                for (LabSeatReservationDTO res : lsList) {
+                    tableModel.addRow(new Object[]{
+                            "LS-" + res.getReservationID(),
+                            res.getReservedSeat() != null && res.getReservedSeat().getSeatLocation() != null
+                                    ? buildLabSeatDisplay(res)
+                                    : "Lab Seat",
+                            res.getDateTime().format(formatter),
+                            formatStatus(res.getApprovalStatus().name())
+                    });
+                }
+            }
+        }
+        else {
+            RequestEnvelope<Void> requestEquipment = new RequestEnvelope<>(
+                    UUID.randomUUID(),
+                    "GET_ALL_EQUIPMENT_RESERVATIONS",
+                    null
+            );
+            clientController.sendRequest(requestEquipment);
+            ResponseEnvelope<List<EquipmentReservationDTO>> responseEquipment = clientController.receiveResponse();
+
+            if (responseEquipment != null && responseEquipment.getPayload() != null) {
+                for (EquipmentReservationDTO res : responseEquipment.getPayload()) {
+                    tableModel.addRow(new Object[]{
+                            "EQ-" + res.getReservationID(),
+                            res.getReservedItem() != null ? res.getReservedItem().getDescription() : "Equipment",
+                            res.getDateTime().format(formatter),
+                            formatStatus(res.getApprovalStatus().name())
+                    });
+                }
+            }
+
+            RequestEnvelope<Void> requestLab = new RequestEnvelope<>(
+                    UUID.randomUUID(),
+                    "GET_ALL_LAB_SEAT_RESERVATIONS",
+                    null
+            );
+            clientController.sendRequest(requestLab);
+            ResponseEnvelope<List<LabSeatReservationDTO>> responseLab = clientController.receiveResponse();
+
+            if (responseLab != null && responseLab.getPayload() != null) {
+                for (LabSeatReservationDTO res : responseLab.getPayload()) {
+                    tableModel.addRow(new Object[]{
+                            "LS-" + res.getReservationID(),
+                            res.getReservedSeat() != null && res.getReservedSeat().getSeatLocation() != null
+                                    ? buildLabSeatDisplay(res)
+                                    : "Lab Seat",
+                            res.getDateTime().format(formatter),
+                            formatStatus(res.getApprovalStatus().name())
+                    });
+                }
+            }
         }
         
         updateStatCards();
     }
     
     private void updateStatCards() {
-        int active = 0, pending = 0, completed = 0;
+        int active = 0, pending = 0, cancelled = 0;
         for (int i = 0; i < tableModel.getRowCount(); i++) {
             String status = (String) tableModel.getValueAt(i, 3);
             switch (status) {
                 case "Approved" -> active++;
                 case "Pending" -> pending++;
-                case "Completed" -> completed++;
+                case "Cancelled" -> cancelled++;
             }
         }
         activeCountLabel.setText(String.valueOf(active));
         pendingCountLabel.setText(String.valueOf(pending));
-        completedCountLabel.setText(String.valueOf(completed));
+        completedCountLabel.setText(String.valueOf(cancelled));
+    }
+
+    private String formatStatus(String rawStatus) {
+        String lower = rawStatus.toLowerCase();
+        return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
+    }
+
+    private void applyFilter(String searchText) {
+        if (searchText == null || searchText.isBlank()) {
+            tableSorter.setRowFilter(null);
+            return;
+        }
+        tableSorter.setRowFilter(RowFilter.regexFilter("(?i)" + java.util.regex.Pattern.quote(searchText.trim())));
+    }
+
+    private String getLabDisplayName(dto.LabDTO lab) {
+        if (lab == null) {
+            return "";
+        }
+        if (lab.getName() != null && !lab.getName().isBlank()) {
+            return lab.getName();
+        }
+        return lab.getLabID() != null ? lab.getLabID() : "";
+    }
+
+    private String buildLabSeatDisplay(LabSeatReservationDTO reservation) {
+        String labDisplay = getLabDisplayName(reservation.getReservedSeat().getSeatLocation());
+        String seatDisplay = reservation.getReservedSeat().getSeatCode();
+        if (seatDisplay == null || seatDisplay.isBlank()) {
+            seatDisplay = "Seat " + reservation.getReservedSeat().getSeatID();
+        }
+        return labDisplay + " - " + seatDisplay;
     }
     
     /**
@@ -318,9 +493,15 @@ public class Dashboard extends JInternalFrame{
      * Requirement #4 — real-time updates hook.
      */
     public void refreshTable() {
-        // TODO: Request updated reservation list from server (Phase 2)
-        loadSampleData();
+        loadData(userDTO, clientController);
         JOptionPane.showMessageDialog(this,
                 "Reservations refreshed.", "Refresh", JOptionPane.INFORMATION_MESSAGE);
     }
+
+    private void refreshTableSilently() {
+        if (isDisplayable()) {
+            loadData(userDTO, clientController);
+        }
+    }
 }
+

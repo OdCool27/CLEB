@@ -1,10 +1,8 @@
-package server.model;
+package model;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
 
-public class Employee extends User {
+public class Employee extends User{
     private String empID;
     private String jobTitle;
 

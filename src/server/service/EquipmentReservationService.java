@@ -1,29 +1,52 @@
-package server.service;
+package service;
 
-import server.dao.EquipmentReservationDAO;
-import server.model.EquipmentReservation;
-import server.model.Reservation;
+import dao.EquipmentReservationDAO;
+import dao.EmployeeDAO;
+import dao.StudentDAO;
+import model.EquipmentReservation;
+import model.Reservation;
+import model.User;
+
 import java.sql.Connection;
 import java.util.List;
 
-public class EquipmentReservationService implements IReservationService<EquipmentReservation> {
+public class EquipmentReservationService implements ReservationService<EquipmentReservation>{
     private EquipmentReservationDAO reservationDAO;
+    private StudentDAO studentDAO;
+    private EmployeeDAO employeeDAO;
 
     public EquipmentReservationService(Connection connection) {
         this.reservationDAO = new EquipmentReservationDAO(connection);
+        this.studentDAO = new StudentDAO(connection);
+        this.employeeDAO = new EmployeeDAO(connection);
     }
 
     @Override
     public boolean createReservation(EquipmentReservation reservation) {
-        return reservationDAO.saveEquipmentReservation(reservation);
+        boolean success = reservationDAO.saveEquipmentReservation(reservation);
+        if (success) {
+            notifyReservationOwner(reservation, NotificationType.CREATED);
+        }
+        return success;
     }
 
     @Override
     public boolean cancelReservation(int reservationID) {
+        return cancelReservation(reservationID, null);
+    }
+
+    public boolean cancelReservation(int reservationID, String approvedBy) {
         EquipmentReservation reservation = reservationDAO.getEquipmentReservationById(reservationID);
         if (reservation != null) {
             reservation.setApprovalStatus(Reservation.ReservationStatus.CANCELLED);
-            return reservationDAO.updateEquipmentReservation(reservation);
+            if (approvedBy != null && !approvedBy.isBlank()) {
+                reservation.setApprovedBy(approvedBy);
+            }
+            boolean success = reservationDAO.updateEquipmentReservation(reservation);
+            if (success) {
+                notifyReservationOwner(reservation, NotificationType.CANCELLED);
+            }
+            return success;
         }
         return false;
     }
@@ -54,7 +77,11 @@ public class EquipmentReservationService implements IReservationService<Equipmen
         if (reservation != null) {
             reservation.setApprovalStatus(Reservation.ReservationStatus.APPROVED);
             reservation.setApprovedBy(approvedBy);
-            return reservationDAO.updateEquipmentReservation(reservation);
+            boolean success = reservationDAO.updateEquipmentReservation(reservation);
+            if (success) {
+                notifyReservationOwner(reservation, NotificationType.MODIFIED);
+            }
+            return success;
         }
         return false;
     }
@@ -65,8 +92,54 @@ public class EquipmentReservationService implements IReservationService<Equipmen
         if (reservation != null) {
             reservation.setApprovalStatus(Reservation.ReservationStatus.REJECTED);
             reservation.setApprovedBy(approvedBy);
-            return reservationDAO.updateEquipmentReservation(reservation);
+            boolean success = reservationDAO.updateEquipmentReservation(reservation);
+            if (success) {
+                notifyReservationOwner(reservation, NotificationType.MODIFIED);
+            }
+            return success;
         }
         return false;
+    }
+
+    @Override
+    public boolean completeReservation(int reservationID) {
+        EquipmentReservation reservation = reservationDAO.getEquipmentReservationById(reservationID);
+        if (reservation != null) {
+            reservation.setApprovalStatus(Reservation.ReservationStatus.COMPLETE);
+            boolean success = reservationDAO.updateEquipmentReservation(reservation);
+            if (success) {
+                notifyReservationOwner(reservation, NotificationType.MODIFIED);
+            }
+            return success;
+        }
+        return false;
+    }
+
+    // Reservation notifications are resolved by identifier so both students and employees can receive them.
+    private void notifyReservationOwner(EquipmentReservation reservation, NotificationType type) {
+        String email = resolveReservationOwnerEmail(reservation.getStudentID());
+        if (email == null || email.isBlank()) {
+            return;
+        }
+
+        switch (type) {
+            case CREATED -> NotificationService.sendReservationCreationNotification(email, reservation);
+            case MODIFIED -> NotificationService.sendReservationModificationNotification(email, reservation);
+            case CANCELLED -> NotificationService.sendReservationDeletionNotification(email, reservation);
+        }
+    }
+
+    private String resolveReservationOwnerEmail(String identifier) {
+        User owner = studentDAO.getStudentByStudentId(identifier);
+        if (owner == null) {
+            owner = employeeDAO.getEmployeeById(identifier);
+        }
+        return owner != null ? owner.getEmail() : null;
+    }
+
+    private enum NotificationType {
+        CREATED,
+        MODIFIED,
+        CANCELLED
     }
 }

@@ -1,7 +1,7 @@
-package server.dao;
+package dao;
 
-import server.dto.UserDTO;
-import server.model.User;
+import dto.UserDTO;
+import model.User;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -152,6 +152,25 @@ public class UserDAO {
         } catch (Exception e) {
             logger.error("Unexpected error while retrieving user by ID", e);
 
+        }
+
+        return null;
+    }
+
+    public String getPasswordHashByUserId(int inputtedUserID) {
+        String sql = "SELECT passwordHash FROM `User` WHERE userID = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, inputtedUserID);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("passwordHash");
+                }
+            }
+        } catch (SQLException sqle) {
+            logger.error("Failed to retrieve password hash for userID: {}", inputtedUserID, sqle);
+        } catch (Exception e) {
+            logger.error("Unexpected error while retrieving password hash", e);
         }
 
         return null;

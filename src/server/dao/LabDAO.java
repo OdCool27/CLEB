@@ -1,25 +1,23 @@
-package server.dao;
+package dao;
 
-import server.model.Lab;
-import server.model.Location;
-
+import model.Lab;
+import model.LabSeat;
+import model.Location;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class LabDAO {
     private static final Logger logger = LogManager.getLogger(LabDAO.class);
     private final Connection conn;
+    private final LabSeatDAO labSeatDAO;
 
     public LabDAO(Connection conn) {
         this.conn = conn;
+        this.labSeatDAO = new LabSeatDAO(conn);
     }
 
     // INITIALIZES LAB TABLE IN DATABASE
@@ -62,6 +60,12 @@ public class LabDAO {
 
             int rowsAffected = pstmt.executeUpdate();
             if (rowsAffected > 0) {
+                // Create the seat inventory immediately so new labs are bookable as soon as they are added.
+                if (!createSeatsForLab(lab)) {
+                    deleteLab(lab.getLabID());
+                    logger.error("Lab seats could not be created, so lab {} was rolled back", lab.getLabID());
+                    return false;
+                }
                 logger.info("Lab saved successfully: {}", lab.getLabID());
             }
             return rowsAffected > 0;
@@ -72,6 +76,27 @@ public class LabDAO {
             logger.error("Unexpected exception while inserting lab", e);
         }
         return false;
+    }
+
+    private boolean createSeatsForLab(Lab lab) {
+        String seatPrefix = buildSeatPrefix(lab);
+
+        for (int seatNumber = 1; seatNumber <= lab.getNumOfSeats(); seatNumber++) {
+            LabSeat seat = new LabSeat();
+            seat.setSeatLocation(lab);
+            seat.setSeatCode(String.format("%s-%02d", seatPrefix, seatNumber));
+
+            if (!labSeatDAO.saveLabSeat(seat)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private String buildSeatPrefix(Lab lab) {
+        String roomName = lab.getLocation() != null ? lab.getLocation().getRoomName() : "";
+        return roomName == null ? "" : roomName.trim().toUpperCase();
     }
 
     public Lab getLabById(String labID) {

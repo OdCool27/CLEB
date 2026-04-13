@@ -1,18 +1,12 @@
-package server.dao;
+package dao;
 
-import server.model.LabSeat;
-import server.model.LabSeatReservation;
-import server.model.Reservation;
-
+import model.LabSeat;
+import model.LabSeatReservation;
+import model.Reservation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Timestamp;
+import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,9 +14,11 @@ import java.util.List;
 public class LabSeatReservationDAO {
     private static final Logger logger = LogManager.getLogger(LabSeatReservationDAO.class);
     private final Connection conn;
+    private final LabSeatDAO labSeatDAO;
 
     public LabSeatReservationDAO(Connection conn) {
         this.conn = conn;
+        this.labSeatDAO = new LabSeatDAO(conn);
     }
 
     // INITIALIZES LAB SEAT RESERVATION TABLE IN DATABASE
@@ -320,8 +316,12 @@ public class LabSeatReservationDAO {
         String approvedBy = rs.getString("approvedBy");
         int seatID = rs.getInt("seatID");
 
-        LabSeat seat = new LabSeat();
-        seat.setSeatID(seatID);
+        // Load the full seat so seatCode and lab details are available to the client.
+        LabSeat seat = labSeatDAO.getLabSeatById(seatID);
+        if (seat == null) {
+            seat = new LabSeat();
+            seat.setSeatID(seatID);
+        }
 
         LabSeatReservation reservation = new LabSeatReservation(
                 reservationID,

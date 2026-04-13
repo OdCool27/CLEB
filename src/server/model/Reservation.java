@@ -1,4 +1,4 @@
-package server.model;
+package model;
 
 import java.time.LocalDateTime;
 
@@ -11,7 +11,7 @@ public class Reservation {
     protected String approvedBy;
     protected LocalDateTime lastUpdated;
 
-    public enum ReservationStatus {PENDING, APPROVED, REJECTED, CANCELLED}
+    public enum ReservationStatus {PENDING, APPROVED, REJECTED, CANCELLED, COMPLETE}
     /*
         Pending -> Reservation awaits approval
         Approved -> Staff has approved reservation request

@@ -1,6 +1,8 @@
-package server.model;
+package model;
 
-import java.time.LocalDateTime;public abstract class User {
+import java.time.LocalDateTime;
+
+public abstract class User {
     protected int userID;
     protected String firstName;
     protected String lastName;

@@ -1,4 +1,4 @@
-package server.model;
+package model;
 
 import java.time.LocalDateTime;
 
@@ -11,8 +11,8 @@ public class LabSeatReservation extends Reservation {
     }
 
     public LabSeatReservation(int reservationID, String studentID, LocalDateTime dateTime,
-                           int durationInHours, ReservationStatus approvalStatus, String approvedBy,
-                           LabSeat reservedSeat) {
+                              int durationInHours, ReservationStatus approvalStatus, String approvedBy,
+                              LabSeat reservedSeat) {
         super(reservationID, studentID, dateTime, durationInHours, approvalStatus, approvedBy);
         this.reservedSeat = reservedSeat;
     }

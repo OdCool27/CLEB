@@ -1,16 +1,11 @@
-package server.dao;
+package dao;
 
-import server.model.Lab;
-import server.model.LabSeat;
-
+import model.Lab;
+import model.LabSeat;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
